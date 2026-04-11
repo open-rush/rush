@@ -14,13 +14,15 @@
     "build": "tsup src/index.ts --format esm,cjs --dts",
     "check": "tsc --noEmit",
     "lint": "biome check .",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "clean": "rm -rf dist node_modules coverage"
   },
   "dependencies": {
-    "ioredis": "^5.6.0"
+    "ioredis": "^5.6.0",
+    "resumable-stream": "^2.2.0"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.8.0",
     "vitest": "^4.0.0"
