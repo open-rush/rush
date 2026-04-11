@@ -64,11 +64,15 @@ No multi-provider abstraction. Claude Code CLI is the sole agent runtime, config
 | **AWS Bedrock** | `CLAUDE_CODE_USE_BEDROCK=1` + AWS creds + `ANTHROPIC_MODEL=arn:...` | AWS Bedrock with ARN |
 | **Custom endpoint** | `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | Compatible APIs (e.g. Zhipu GLM) |
 
-The platform auto-detects connection mode from user's Vault credentials and injects the appropriate env vars into the sandbox.
+All credentials are managed through Vault. The platform auto-detects connection mode and selects the injection strategy:
 
-For Anthropic API and custom endpoint modes, the auth token goes through Credential Proxy (never enters the container). For Bedrock, AWS credentials must be in the container env (SigV4 requirement), protected by defense-in-depth.
+| Mode | Vault Type | Injection | Key in container? |
+|------|-----------|-----------|-------------------|
+| Anthropic API | `anthropic_api` | Vault → Credential Proxy | No |
+| Custom endpoint | `custom_endpoint` | Vault → Credential Proxy | No |
+| AWS Bedrock | `aws_bedrock` | Vault → env injection | Yes (SigV4 requires it) |
 
-Reference: https://docs.bigmodel.cn/cn/coding-plan/tool/claude
+Users only interact with Vault. Credential Proxy is an internal transport — invisible to users.
 
 ---
 
