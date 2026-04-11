@@ -28,67 +28,184 @@ Rush 不是某个单一工具的替代品，而是将多个场景统一在一个
 
 ## 愿景
 
-```
-                              Rush
-                    ┌──────────────────────┐
-                    │   AI Agent 基础设施    │
-入口                │                      │        场景
-                    │  ┌────────────────┐  │
- Web UI (所有人) ───┤  │ Agent 编排     │  ├──► 应用构建
- CLI   (研发)   ───┤  │ 沙箱隔离       │  ├──► 代码生成
- API   (系统集成)───┤  │ Skills & MCP   │  ├──► 数据分析
- SDK   (嵌入产品)───┤  │ Memory         │  ├──► 工作流自动化
-                    │  │ Vault          │  ├──► 文档生成
-                    │  │ 可观测性       │  ├──► 多模态任务
-                    │  └────────────────┘  │
-                    └──────────────────────┘
-                         你的基础设施
+> 一次部署，全员可用。多种入口接入，多种场景覆盖，统一平台承载。
+
+```mermaid
+graph LR
+    subgraph entry["入口层"]
+        direction TB
+        WebUI["🌐 Web UI<br/><small>所有人</small>"]
+        CLI["⌨️ CLI<br/><small>研发</small>"]
+        API["🔌 API<br/><small>系统集成</small>"]
+        SDK["📦 SDK<br/><small>嵌入产品</small>"]
+    end
+
+    subgraph platform["Rush 平台层"]
+        direction TB
+        Orch["Agent 编排<br/><small>对话 · 状态机 · 断点恢复</small>"]
+        Sandbox["沙箱隔离<br/><small>可插拔运行时</small>"]
+        SkillsMCP["Skills & MCP<br/><small>插件生态</small>"]
+        Mem["Memory<br/><small>跨会话学习</small>"]
+        Vault["Vault<br/><small>双层凭据管理</small>"]
+        Obs["可观测性<br/><small>OTEL · LLM 成本</small>"]
+    end
+
+    subgraph scenarios["场景层"]
+        direction TB
+        S1["🏗️ 应用构建"]
+        S2["💻 代码生成"]
+        S3["📊 数据分析"]
+        S4["⚙️ 工作流自动化"]
+        S5["📝 文档生成"]
+        S6["🎨 多模态任务"]
+    end
+
+    WebUI --> platform
+    CLI --> platform
+    API --> platform
+    SDK --> platform
+
+    platform --> S1
+    platform --> S2
+    platform --> S3
+    platform --> S4
+    platform --> S5
+    platform --> S6
+
+    style entry fill:#f0f4ff,stroke:#4a6cf7
+    style platform fill:#f0fdf4,stroke:#22c55e
+    style scenarios fill:#fefce8,stroke:#eab308
 ```
 
 **当前 scope（M0–M4）：** 平台层 + 应用构建场景 + Web UI 入口。CLI、API、SDK 及更多场景在 GA 之后推进。
 
 ## 架构
 
-三层设计，沙箱可插拔：
+三层设计 —— 用户请求经控制面编排，在沙箱容器中由 Claude Code 执行，结果流式返回。
 
+```mermaid
+graph TB
+    User["👤 用户"]
+
+    subgraph web["apps/web · Next.js 16"]
+        Portal["用户界面"]
+        ControlAPI["控制面 API"]
+        SSE2["SSE② 端点"]
+    end
+
+    subgraph cw["apps/control-worker"]
+        Queue["pg-boss 任务队列"]
+        SM["RunStateMachine<br/><small>15 状态 · 重试 · Finalization</small>"]
+        Bridge["Agent Bridge"]
+    end
+
+    subgraph sb["沙箱容器 · SandboxProvider"]
+        AW["apps/agent-worker<br/><small>Hono :8787</small>"]
+        CC["Claude Code<br/><small>Anthropic API / Bedrock / 自定义端点</small>"]
+        WS["工作区文件"]
+        Dev["开发服务器<br/><small>实时预览</small>"]
+        Execd["execd daemon<br/><small>文件 I/O · Shell 执行</small>"]
+    end
+
+    PG[("PostgreSQL<br/>+ pgvector")]
+    Redis[("Redis<br/>SSE 流")]
+    S3[("S3 兼容存储<br/>MinIO / AWS")]
+    VaultDB["Vault<br/><small>加密凭据</small>"]
+
+    User -->|"SSE 流式"| Portal
+    Portal --> ControlAPI
+    ControlAPI -->|"入队"| Queue
+    Queue --> SM
+    SM -->|"SSE①"| Bridge
+    Bridge --> AW
+    AW --> CC
+    CC --> WS
+    CC --> Dev
+
+    SM -.->|"生命周期管理"| Execd
+    SSE2 -->|"SSE②"| User
+
+    SM --> PG
+    SM --> Redis
+    SM --> S3
+    ControlAPI --> VaultDB
+
+    style web fill:#eff6ff,stroke:#3b82f6
+    style cw fill:#f0fdf4,stroke:#22c55e
+    style sb fill:#fefce8,stroke:#eab308
 ```
-Browser / CLI / API
-  │
-  │  SSE (流式传输)
-  ▼
-apps/web (Next.js 16)          — 用户界面 + 控制面 API
-  │
-  │  pg-boss 任务队列
-  ▼
-apps/control-worker             — 编排引擎 + 15 状态机
-  │
-  │  SandboxProvider 接口
-  ▼
-沙箱容器
-  ├── apps/agent-worker (Hono)  — Claude Code 执行
-  ├── 工作区文件
-  └── 开发服务器
+
+### 沙箱可插拔
+
+```mermaid
+graph LR
+    CW["Control Worker"]
+    SPI["SandboxProvider 接口"]
+    OS["OpenSandbox<br/><small>默认</small>"]
+    E2B["E2B"]
+    Docker["Docker"]
+    Fly["Fly.io"]
+    Custom["自定义..."]
+
+    CW --> SPI
+    SPI --> OS
+    SPI -.-> E2B
+    SPI -.-> Docker
+    SPI -.-> Fly
+    SPI -.-> Custom
+
+    style SPI fill:#f5f3ff,stroke:#7c3aed,stroke-width:2px
+    style OS fill:#f0fdf4,stroke:#22c55e
 ```
+
+`SandboxProvider` 是公开接口。OpenSandbox 是内置默认实现，社区可贡献其他实现。通过环境变量一键切换：`SANDBOX_PROVIDER=opensandbox | e2b | docker`
+
+### 凭据安全
+
+```mermaid
+graph LR
+    subgraph vault["Vault（统一管理）"]
+        PV["平台 Vault<br/><small>运维配置 · 用户不可见</small>"]
+        UV["用户 Vault<br/><small>自助管理</small>"]
+    end
+
+    subgraph inject["注入策略（自动选择）"]
+        Proxy["Credential Proxy<br/><small>密钥不进容器</small>"]
+        Env["受控 Env 注入<br/><small>Bedrock SigV4</small>"]
+        File["临时文件<br/><small>GIT_ASKPASS · .npmrc</small>"]
+    end
+
+    PV --> Proxy
+    PV --> Env
+    UV --> Proxy
+    UV --> File
+
+    style vault fill:#fef2f2,stroke:#ef4444
+    style inject fill:#f0fdf4,stroke:#22c55e
+    style Proxy fill:#dcfce7,stroke:#22c55e,stroke-width:2px
+```
+
+用户只和 Vault 交互。Credential Proxy 是内部传输层，对用户不可见。
 
 ## 平台能力
 
 | 能力 | 说明 |
 |------|------|
-| **Agent 编排** | 对话、任务分发、15 状态机、断点恢复 |
-| **沙箱隔离** | 每任务独立容器，可插拔运行时（OpenSandbox、E2B、Docker...） |
-| **Skills & MCP** | 插件市场 + Model Context Protocol 服务器 |
-| **Memory** | 跨会话学习、用户偏好、向量搜索 |
-| **Vault** | 双层凭据管理 —— 平台级（运维）+ 用户级（自助），自动安全注入 |
-| **多租户** | 用户隔离、项目隔离、RBAC 权限 |
+| **Agent 编排** | 对话、任务分发、15 状态机、断点恢复、流式中间件 |
+| **沙箱隔离** | 每任务独立容器，可插拔运行时，资源限制，网络策略 |
+| **Skills & MCP** | 插件市场 + Model Context Protocol 服务器扩展 |
+| **Memory** | 跨会话学习、用户偏好、pgvector 向量搜索 |
+| **Vault** | 双层凭据（平台 + 用户），Credential Proxy 零密钥容器 |
+| **多租户** | 用户隔离、项目隔离、RBAC 权限控制 |
 | **可观测性** | OpenTelemetry traces + metrics + LLM 成本追踪 |
 
 ## 设计原则
 
 - **自托管优先** —— 你的数据、你的基础设施、你的规则
-- **沙箱可插拔** —— `SandboxProvider` 接口，自带容器运行时
 - **Claude Code 原生** —— 三种连接模式：Anthropic API / AWS Bedrock / 自定义端点
-- **安全默认** —— Credential Proxy 实现零密钥容器，双层 Vault
-- **零供应商锁定** —— 标准 OTEL、NextAuth.js、S3 兼容存储、Drizzle ORM
+- **安全默认** —— 双层 Vault + Credential Proxy，凭据按类型自动选择最安全注入方式
+- **可插拔** —— 沙箱、存储、认证、可观测后端均可替换
+- **零供应商锁定** —— 标准 OTEL、NextAuth.js、S3 兼容、Drizzle ORM
 
 ## 技术栈
 
