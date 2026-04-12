@@ -1,4 +1,5 @@
 export * from './auth/index.js';
+export * from './conversation/index.js';
 export {
   type EventStore,
   type EventStoreEvent,

@@ -1,6 +1,7 @@
 export { accounts } from './accounts.js';
 export { agents } from './agents.js';
 export { artifacts } from './artifacts.js';
+export { conversations } from './conversations.js';
 export { projectMembers } from './project-members.js';
 export { projects } from './projects.js';
 export { runCheckpoints } from './run-checkpoints.js';

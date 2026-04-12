@@ -7,6 +7,7 @@ export type TestDb = ReturnType<typeof drizzle<typeof schema>>;
 
 const TABLE_NAMES = [
   'vault_entries',
+  'conversations',
   'artifacts',
   'run_checkpoints',
   'run_events',
@@ -127,6 +128,21 @@ async function applySchema(db: TestDb): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       last_active_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // Conversations
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT,
+      summary TEXT,
+      metadata JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
 
