@@ -23,13 +23,13 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.3.0",
+    "@electric-sql/pglite": "^0.4.4",
     "@types/node": "^22.0.0",
-    "drizzle-kit": "^0.30.0",
+    "drizzle-kit": "^0.31.10",
     "tsup": "^8.0.0",
     "typescript": "^5.8.0",
     "vitest": "^4.0.0"

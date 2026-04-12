@@ -26,7 +26,7 @@
     "test:integration": "turbo test:integration"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.0.6",
+    "@biomejs/biome": "2.4.11",
     "turbo": "^2.5.0",
     "typescript": "^5.8.0"
   }
