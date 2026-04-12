@@ -11,7 +11,7 @@ import {
 import { Message, MessageContent } from '@/components/ai-elements/message';
 import { LoadingDots } from '@/components/ui/loading-dots';
 import { PartRenderer } from './part-renderer';
-import { PromptInput } from './prompt-input';
+import { PromptInput } from './chat-input';
 
 export function ChatView() {
   const transport = useMemo(() => new TextStreamChatTransport({ api: '/api/chat' }), []);

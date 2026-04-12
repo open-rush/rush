@@ -17,7 +17,7 @@ import {
 import { memo, useCallback, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { CodeBlock } from './code-block';
+import { CodeBlock } from './inline-code-block';
 
 // --- Performance render strategy (from rush-app) ---
 

@@ -60,7 +60,6 @@ open-rush/
 │   ├── agent-runtime/          # AI Provider abstraction (Claude, Codex, Gemini, OpenAI)
 │   ├── stream/                 # Redis-backed resumable SSE
 │   ├── integrations/           # External integrations (GitHub, S3, OAuth)
-│   ├── ai-components/          # React AI UI component library
 │   ├── skills/                 # Skills runtime (install, discover, execute)
 │   ├── mcp/                    # MCP server management (lifecycle, proxy, registry)
 │   └── memory/                 # User memory system (embedding, search, personalization)
@@ -233,7 +232,6 @@ Control Worker
 
 ### Phase 2b: Experience Enhancement (Week 10-11)
 
-- [ ] `packages/ai-components` — 64 React AI components
 - [ ] Vault — full credential management + type-based injection strategy
 - [ ] Template system — template registry + scaffolding
 - [ ] Extension API v1 contract (for Skills/MCP plugin ecosystem)

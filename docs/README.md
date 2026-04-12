@@ -33,7 +33,6 @@ Browser → apps/web (Next.js) → apps/control-worker (pg-boss) → apps/agent-
 | stream | Redis-backed SSE |
 | observability | Logging + OTEL |
 | integrations | S3 storage |
-| ai-components | React AI UI components |
 | skills | reskill-based skill management |
 | mcp | MCP server registry |
 | memory | pgvector + hybrid search |

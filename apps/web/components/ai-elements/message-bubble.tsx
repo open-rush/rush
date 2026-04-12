@@ -2,7 +2,7 @@
 
 import type { UIMessage } from 'ai';
 import { cn } from '@/lib/utils';
-import { CodeBlock } from './code-block';
+import { CodeBlock } from './inline-code-block';
 import { ToolCard } from './tool-card';
 
 interface MessageBubbleProps {
