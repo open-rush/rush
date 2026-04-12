@@ -3,25 +3,25 @@ import { auth, signIn } from '@/auth';
 
 export default async function LoginPage() {
   const session = await auth();
-  if (session?.user) redirect('/dashboard');
+  if (session?.user) redirect('/');
 
   return (
     <main className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-6 p-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold">Sign In</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-2">Sign in to your Rush account</p>
+          <p className="text-muted-foreground mt-2">Sign in to your Rush account</p>
         </div>
         <form
           className="space-y-4"
           action={async () => {
             'use server';
-            await signIn('github', { redirectTo: '/dashboard' });
+            await signIn('github', { redirectTo: '/' });
           }}
         >
           <button
             type="submit"
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-3 font-medium hover:bg-gray-50 dark:hover:bg-gray-900 flex items-center justify-center gap-2"
+            className="w-full rounded-lg border border-border px-4 py-3 font-medium hover:bg-accent flex items-center justify-center gap-2 transition-colors"
           >
             <GitHubIcon />
             Continue with GitHub

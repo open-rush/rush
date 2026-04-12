@@ -11,7 +11,8 @@ export function middleware(req: NextRequest) {
   const sessionCookie =
     req.cookies.get('authjs.session-token') ?? req.cookies.get('__Secure-authjs.session-token');
 
-  const isProtected = req.nextUrl.pathname.startsWith('/dashboard');
+  const pathname = req.nextUrl.pathname;
+  const isProtected = pathname.startsWith('/dashboard') || pathname === '/';
 
   if (isProtected && !sessionCookie?.value) {
     const loginUrl = new URL('/login', req.nextUrl);

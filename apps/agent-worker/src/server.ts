@@ -1,109 +1,85 @@
-import crypto from 'node:crypto';
 import { serve } from '@hono/node-server';
+import { streamText } from 'ai';
+import { claudeCode } from 'ai-sdk-provider-claude-code';
 import { Hono } from 'hono';
-
-const CHUNK_SIZE = 20;
-const CHUNK_DELAY_MS = 50;
-
-function splitIntoChunks(text: string, size: number): string[] {
-  const chunks: string[] = [];
-  for (let i = 0; i < text.length; i += size) {
-    chunks.push(text.slice(i, i + size));
-  }
-  return chunks;
-}
-
-function sseLine(payload: Record<string, unknown>): string {
-  return `data: ${JSON.stringify(payload)}\n\n`;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 const app = new Hono();
 
-app.get('/health', (c) => {
-  return c.json({ status: 'ok', service: 'agent-worker', timestamp: new Date().toISOString() });
-});
+// Track active sessions for abort support
+const activeSessions = new Map<string, AbortController>();
 
-app.get('/status', (c) => {
-  return c.json({ ready: true, activeRuns: 0 });
-});
+app.get('/health', (c) =>
+  c.json({
+    status: 'ok',
+    service: 'agent-worker',
+    activeRuns: activeSessions.size,
+    timestamp: new Date().toISOString(),
+  })
+);
+
+app.get('/status', (c) => c.json({ ready: true, activeRuns: activeSessions.size }));
 
 app.post('/prompt', async (c) => {
   const body = await c.req.json();
-  const { prompt, streamId: clientStreamId } = body as {
+  const { prompt, sessionId, messages } = body as {
     prompt?: string;
     sessionId?: string;
-    env?: Record<string, string>;
-    streamId?: string;
+    messages?: Array<{ role: string; content: string }>;
   };
 
-  if (!prompt) {
+  // Support both prompt (direct) and messages (AI SDK useChat) formats
+  const userPrompt = prompt ?? messages?.filter((m) => m.role === 'user').pop()?.content;
+  if (!userPrompt) {
     return c.json({ error: 'prompt is required' }, 400);
   }
 
-  const streamId = clientStreamId ?? crypto.randomUUID();
-  const stepId = crypto.randomUUID();
-  const msgId = crypto.randomUUID();
-  const chunks = splitIntoChunks(prompt, CHUNK_SIZE);
+  const abortController = new AbortController();
+  const sid = sessionId ?? crypto.randomUUID();
+  activeSessions.set(sid, abortController);
 
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      const enqueue = (payload: Record<string, unknown>) => {
-        controller.enqueue(encoder.encode(sseLine(payload)));
-      };
+  try {
+    // Model from env: ANTHROPIC_MODEL (Bedrock ARN) or fallback
+    const modelId = process.env.ANTHROPIC_MODEL || 'sonnet';
 
-      // Stream start
-      enqueue({ type: 'start', id: streamId });
-      await delay(CHUNK_DELAY_MS);
+    const result = streamText({
+      model: claudeCode(modelId, {
+        permissionMode: 'bypassPermissions',
+        maxTurns: 30,
+        sessionId: sid,
+      }),
+      prompt: userPrompt,
+      abortSignal: abortController.signal,
+    });
 
-      // Step start
-      enqueue({ type: 'start-step', id: stepId });
-      await delay(CHUNK_DELAY_MS);
+    // AI SDK text stream response — compatible with useChat on frontend
+    const response = result.toTextStreamResponse();
 
-      // Text start
-      enqueue({ type: 'text-start', id: msgId });
-      await delay(CHUNK_DELAY_MS);
+    // Cleanup after stream ends
+    Promise.resolve(result.response).then(
+      () => activeSessions.delete(sid),
+      () => activeSessions.delete(sid)
+    );
 
-      // Echo prefix
-      enqueue({ type: 'text-delta', id: msgId, delta: 'Echo: ' });
-      await delay(CHUNK_DELAY_MS);
-
-      // Prompt chunks
-      for (const chunk of chunks) {
-        enqueue({ type: 'text-delta', id: msgId, delta: chunk });
-        await delay(CHUNK_DELAY_MS);
-      }
-
-      // Text end
-      enqueue({ type: 'text-end', id: msgId });
-      await delay(CHUNK_DELAY_MS);
-
-      // Step finish
-      enqueue({ type: 'finish-step', id: stepId });
-      await delay(CHUNK_DELAY_MS);
-
-      // Stream finish
-      enqueue({ type: 'finish', id: streamId, reason: 'end_turn' });
-
-      controller.close();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  });
+    return response;
+  } catch (err: unknown) {
+    activeSessions.delete(sid);
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: message }, 500);
+  }
 });
 
-app.post('/abort', (c) => {
-  return c.json({ aborted: true });
+app.post('/abort', async (c) => {
+  const { sessionId } = (await c.req.json()) as { sessionId?: string };
+  if (!sessionId) {
+    return c.json({ error: 'sessionId is required' }, 400);
+  }
+  const controller = activeSessions.get(sessionId);
+  if (controller) {
+    controller.abort();
+    activeSessions.delete(sessionId);
+    return c.json({ aborted: true });
+  }
+  return c.json({ aborted: false, reason: 'session not found' }, 404);
 });
 
 const port = Number.parseInt(process.env.PORT ?? '8787', 10);
