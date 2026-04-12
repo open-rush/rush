@@ -6,6 +6,7 @@ export {
   CheckpointService,
   type CheckpointStorage,
 } from './checkpoint-service.js';
+export { DrizzleCheckpointDb } from './drizzle-checkpoint-db.js';
 export { DrizzleRunDb } from './drizzle-run-db.js';
 export { RunOrchestrator, type RunOrchestratorDeps } from './run-orchestrator.js';
 export { type CreateRunInput, type Run, type RunDb, RunService } from './run-service.js';
@@ -16,6 +17,7 @@ export {
   isTerminal,
   type RunStatus,
 } from './run-state-machine.js';
+export { S3CheckpointStorage, type S3StorageAdapter } from './s3-checkpoint-storage.js';
 export {
   createErrorHandler,
   createIncrementalSave,

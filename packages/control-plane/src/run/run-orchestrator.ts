@@ -2,6 +2,7 @@ import type { CreateSandboxOptions, SandboxProvider } from '@rush/sandbox';
 
 import type { EventStore } from '../event-store.js';
 import { AgentBridge } from './agent-bridge.js';
+import type { CheckpointService } from './checkpoint-service.js';
 import type { RunService } from './run-service.js';
 import {
   createErrorHandler,
@@ -14,6 +15,7 @@ export interface RunOrchestratorDeps {
   runService: RunService;
   sandboxProvider: SandboxProvider;
   eventStore: EventStore;
+  checkpointService?: CheckpointService;
 }
 
 export class RunOrchestrator {
@@ -53,45 +55,63 @@ export class RunOrchestrator {
       // 4. Consume SSE① stream and persist events to DB
       await this.consumeStream(runId, response);
 
-      // 5. Simplified finalization (MVP)
-      await this.deps.runService.transition(runId, 'finalizing_prepare');
-      await this.deps.runService.transition(runId, 'finalizing_uploading');
-      await this.deps.runService.transition(runId, 'finalizing_verifying');
-      await this.deps.runService.transition(runId, 'finalizing_metadata_commit');
-      await this.deps.runService.transition(runId, 'finalized');
-      await this.deps.runService.transition(runId, 'completed');
+      // 5. Finalization
+      await this.finalize(runId);
     } catch (error) {
-      // Attempt to transition to failed
       try {
         await this.deps.runService.transition(runId, 'failed', {
           errorMessage: error instanceof Error ? error.message : String(error),
         });
       } catch {
-        // Best-effort: if transition to failed itself fails, we still want cleanup
+        // Best-effort
       }
     } finally {
-      // Best-effort sandbox cleanup
       if (sandboxId) {
         this.deps.sandboxProvider.destroy(sandboxId).catch(() => {});
       }
     }
   }
 
+  private async finalize(runId: string): Promise<void> {
+    await this.deps.runService.transition(runId, 'finalizing_prepare');
+
+    // Create checkpoint (snapshot events for recovery)
+    if (this.deps.checkpointService) {
+      try {
+        const events = await this.deps.eventStore.getEvents(runId);
+        const lastSeq = await this.deps.eventStore.getLastSeq(runId);
+        const snapshot = Buffer.from(JSON.stringify(events));
+        await this.deps.checkpointService.createCheckpoint(runId, snapshot, lastSeq);
+      } catch (err) {
+        console.error('[finalize] Checkpoint creation failed (non-fatal):', err);
+      }
+    }
+
+    await this.deps.runService.transition(runId, 'finalizing_uploading');
+    // TODO: Upload workspace artifacts to S3
+
+    await this.deps.runService.transition(runId, 'finalizing_verifying');
+    // TODO: Verify artifact checksums
+
+    await this.deps.runService.transition(runId, 'finalizing_metadata_commit');
+    // TODO: Create PR if applicable
+
+    await this.deps.runService.transition(runId, 'finalized');
+    await this.deps.runService.transition(runId, 'completed');
+  }
+
   private async consumeStream(runId: string, response: Response): Promise<void> {
     const pipeline = new StreamPipeline();
 
     pipeline.use(
-      createIncrementalSave(
-        async (event) => {
-          await this.deps.eventStore.append({
-            runId,
-            eventType: event.type,
-            payload: event.data,
-            seq: event.seq,
-          });
-        },
-        1 // flush every event for reliability — batch optimization comes later
-      )
+      createIncrementalSave(async (event) => {
+        await this.deps.eventStore.append({
+          runId,
+          eventType: event.type,
+          payload: event.data,
+          seq: event.seq,
+        });
+      }, 1)
     );
 
     pipeline.use(
