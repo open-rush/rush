@@ -262,6 +262,9 @@ importers:
 
   packages/memory:
     devDependencies:
+      '@types/node':
+        specifier: ^25.6.0
+        version: 25.6.0
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(postcss@8.5.9)(tsx@4.21.0)(typescript@5.9.3)
