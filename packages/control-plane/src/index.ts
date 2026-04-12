@@ -9,4 +9,5 @@ export {
 } from './event-store.js';
 export { type ConsumeResult, IdempotentConsumer } from './idempotent-consumer.js';
 export * from './project/index.js';
+export * from './template/index.js';
 export * from './vault/index.js';
