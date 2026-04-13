@@ -1,8 +1,7 @@
 /**
  * Chat API — POST /api/chat
  *
- * Streams AI responses via Claude Code (GLM compatible endpoint).
- * Reference: rush-app apps/agent/app/api/ai-stream-v2/route.ts
+ * Streams AI responses via Claude Code SDK (supports Anthropic API / AWS Bedrock / custom endpoint).
  */
 
 import { convertToModelMessages, streamText, type UIMessage } from 'ai';
@@ -10,8 +9,46 @@ import { claudeCode } from 'ai-sdk-provider-claude-code';
 import { registerAbortController, unregisterAbortController } from '@/lib/ai/stream-abort-registry';
 import { requireAuth } from '@/lib/api-utils';
 
-// Allow streaming responses up to 300 seconds
 export const maxDuration = 300;
+
+// ---------------------------------------------------------------------------
+// Claude Code model — env vars forwarded to the CLI subprocess
+// ---------------------------------------------------------------------------
+
+const ENV_PASSTHROUGH_KEYS = [
+  // Bedrock
+  'CLAUDE_CODE_USE_BEDROCK',
+  'AWS_REGION',
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'AWS_SESSION_TOKEN',
+  'ANTHROPIC_MODEL',
+  // Direct API / custom endpoint
+  'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_API_KEY',
+  // Network proxy
+  'HTTPS_PROXY',
+  'HTTP_PROXY',
+  'NO_PROXY',
+] as const;
+
+function buildClaudeEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const key of ENV_PASSTHROUGH_KEYS) {
+    if (process.env[key]) {
+      env[key] = process.env[key];
+    }
+  }
+  return env;
+}
+
+const modelId = process.env.CLAUDE_MODEL || process.env.ANTHROPIC_MODEL || 'sonnet';
+
+const model = claudeCode(modelId, {
+  permissionMode: 'bypassPermissions',
+  maxTurns: 30,
+  env: buildClaudeEnv(),
+});
 
 // ---------------------------------------------------------------------------
 // Error helpers
@@ -20,7 +57,7 @@ export const maxDuration = 300;
 function errorResponse(error: string, status: number, details?: unknown): Response {
   return Response.json(
     { error, timestamp: new Date().toISOString(), ...(details ? { details } : {}) },
-    { status }
+    { status },
   );
 }
 
@@ -30,26 +67,6 @@ function classifyStreamError(error: unknown): 'aborted' | '429' | 'unknown' {
     if (error.message.includes('429') || error.message.includes('rate limit')) return '429';
   }
   return 'unknown';
-}
-
-// ---------------------------------------------------------------------------
-// Claude Code model factory
-// ---------------------------------------------------------------------------
-
-function createModel(modelId: string) {
-  const env: Record<string, string> = {};
-  if (process.env.ANTHROPIC_BASE_URL) {
-    env.ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL;
-  }
-  if (process.env.ANTHROPIC_API_KEY) {
-    env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  }
-
-  return claudeCode(modelId, {
-    permissionMode: 'bypassPermissions',
-    maxTurns: 30,
-    ...(Object.keys(env).length > 0 ? { env } : {}),
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -90,9 +107,8 @@ export async function POST(req: Request) {
     const modelMessages = await convertToModelMessages(messages as UIMessage[]);
 
     // 5. Stream
-    const modelId = process.env.CLAUDE_MODEL || 'sonnet';
     const result = streamText({
-      model: createModel(modelId),
+      model,
       messages: modelMessages,
       abortSignal: abortController.signal,
     });
