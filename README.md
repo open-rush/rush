@@ -12,16 +12,6 @@
 2. **可验证的实践** —— 工程成果以公开、可审查的方式呈现
 3. **回馈社区** —— 我们从开源中受益，也希望把积累的经验回馈出去
 
-## 贡献者
-
-| GitHub | 方向 |
-|--------|------|
-| [@pandoralink](https://github.com/pandoralink) | Web 交互体验、AI 对话链路、可观测平台前端 |
-| [@fwxhn](https://github.com/fwxhn) | CLI 工具链、[reskill](https://github.com/nicepkg/reskill) 包管理器、可观测平台前端 |
-| [@yongchaoo](https://github.com/yongchaoo) | MCP 运行时、Agent 交付模式、前端可观测性 |
-
-以上贡献者目前正在看新的机会，欢迎联系。
-
 ## 为什么做 Rush
 
 每个企业都在思考如何让 AI Agent 真正投入工作。当前的选择：锁定某个厂商的云服务、拼凑脆弱的工具链、或者从零构建。
@@ -259,6 +249,16 @@ docker compose up -d    # PostgreSQL, Redis, MinIO, 沙箱服务
 pnpm install
 pnpm build && pnpm check && pnpm test && pnpm lint
 ```
+
+## 贡献者
+
+| GitHub | 方向 |
+|--------|------|
+| [@pandoralink](https://github.com/pandoralink) | Web 交互体验、AI 对话链路、可观测平台前端 |
+| [@fwxhn](https://github.com/fwxhn) | CLI 工具链、[reskill](https://github.com/nicepkg/reskill) 包管理器、可观测平台前端 |
+| [@yongchaoo](https://github.com/yongchaoo) | MCP 运行时、Agent 交付模式、前端可观测性 |
+
+以上贡献者目前正在看新的机会，欢迎联系。
 
 ## 参与贡献
 
