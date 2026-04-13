@@ -10,7 +10,7 @@ export default async function LoginPage() {
       <div className="w-full max-w-sm space-y-6 p-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold">Sign In</h1>
-          <p className="text-muted-foreground mt-2">Sign in to your OpenRush account</p>
+          <p className="text-muted-foreground mt-2">Sign in to your Lux account</p>
         </div>
         <form
           className="space-y-4"

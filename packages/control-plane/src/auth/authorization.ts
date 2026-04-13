@@ -1,4 +1,4 @@
-import type { ProjectMemberRole } from '@rush/contracts';
+import type { ProjectMemberRole } from '@lux/contracts';
 
 export interface MembershipInfo {
   userId: string;

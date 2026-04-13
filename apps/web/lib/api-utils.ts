@@ -1,5 +1,5 @@
-import { DbMembershipStore, DrizzleMembershipDb } from '@rush/control-plane';
-import { getDbClient, projects } from '@rush/db';
+import { DbMembershipStore, DrizzleMembershipDb } from '@lux/control-plane';
+import { getDbClient, projects } from '@lux/db';
 import { eq } from 'drizzle-orm';
 
 import { auth } from '@/auth';

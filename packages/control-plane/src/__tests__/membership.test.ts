@@ -1,4 +1,4 @@
-import type { ProjectMemberRole } from '@rush/contracts';
+import type { ProjectMemberRole } from '@lux/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AuthorizationGuard } from '../auth/authorization.js';
 import {

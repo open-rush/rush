@@ -20,7 +20,7 @@ const BUILTIN_TEMPLATES: ProjectTemplate[] = [
       'index.html':
         '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>My Project</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1>Hello, World!</h1>\n  <script src="main.js"></script>\n</body>\n</html>',
       'style.css': 'body {\n  font-family: system-ui, sans-serif;\n  margin: 2rem;\n}\n',
-      'main.js': "console.log('Hello from OpenRush!');\n",
+      'main.js': "console.log('Hello from Lux!');\n",
     },
   },
   {
@@ -62,7 +62,7 @@ const BUILTIN_TEMPLATES: ProjectTemplate[] = [
     defaultModel: 'claude-sonnet-4-6',
     files: {
       'app/layout.tsx':
-        "import type { Metadata } from 'next';\n\nexport const metadata: Metadata = {\n  title: 'My App',\n  description: 'Built with OpenRush',\n};\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang=\"en\">\n      <body>{children}</body>\n    </html>\n  );\n}\n",
+        "import type { Metadata } from 'next';\n\nexport const metadata: Metadata = {\n  title: 'My App',\n  description: 'Built with Lux',\n};\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang=\"en\">\n      <body>{children}</body>\n    </html>\n  );\n}\n",
       'app/page.tsx':
         "export default function Home() {\n  return (\n    <main style={{ padding: '2rem', fontFamily: 'system-ui' }}>\n      <h1>Hello, Next.js!</h1>\n    </main>\n  );\n}\n",
     },

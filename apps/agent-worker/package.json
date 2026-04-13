@@ -1,5 +1,5 @@
 {
-  "name": "@rush/agent-worker",
+  "name": "@lux/agent-worker",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
-    "@rush/agent-runtime": "workspace:*",
-    "@rush/contracts": "workspace:*",
+    "@lux/agent-runtime": "workspace:*",
+    "@lux/contracts": "workspace:*",
     "ai": "^6.0.158",
     "ai-sdk-provider-claude-code": "^3.4.4",
     "hono": "^4.7.0"

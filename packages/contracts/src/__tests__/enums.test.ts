@@ -126,7 +126,7 @@ describe('AgentStatus', () => {
     expect(() => AgentStatus.parse('closed')).toThrow();
   });
 
-  it('rejects deleted (not in open-rush)', () => {
+  it('rejects deleted (not in lux)', () => {
     expect(() => AgentStatus.parse('deleted')).toThrow();
   });
 });

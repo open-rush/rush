@@ -1,5 +1,5 @@
 {
-  "name": "@rush/agent-runtime",
+  "name": "@lux/agent-runtime",
   "version": "0.0.0",
   "private": true,
   "type": "module",

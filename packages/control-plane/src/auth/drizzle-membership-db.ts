@@ -1,5 +1,5 @@
-import type { ProjectMemberRole } from '@rush/contracts';
-import { type DbClient, projectMembers } from '@rush/db';
+import type { ProjectMemberRole } from '@lux/contracts';
+import { type DbClient, projectMembers } from '@lux/db';
 import { and, eq } from 'drizzle-orm';
 
 import type { MemberRecord, MembershipDb } from './membership-store.js';

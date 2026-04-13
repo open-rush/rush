@@ -44,7 +44,7 @@ export function ChatView() {
         <ConversationContent className="max-w-3xl mx-auto">
           {messages.length === 0 && (
             <ConversationEmptyState
-              title="OpenRush"
+              title="Lux"
               description="Start a conversation with the AI agent."
             />
           )}

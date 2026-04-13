@@ -1,4 +1,4 @@
-Execute the OpenRush development environment setup. Follow each step sequentially, stop and diagnose if any step fails.
+Execute the Lux development environment setup. Follow each step sequentially, stop and diagnose if any step fails.
 
 ## Prerequisites Check
 
@@ -121,7 +121,7 @@ Without these, the web app will start but auth and AI features won't work.
 Print a summary:
 
 ```
-✅ OpenRush development environment ready
+✅ Lux development environment ready
 
 Infrastructure:
   PostgreSQL:  localhost:5432  (rush/rush/rush, pgvector enabled)

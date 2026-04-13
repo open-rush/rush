@@ -1,5 +1,5 @@
-import type { ProjectAgent as ProjectAgentContract } from '@rush/contracts';
-import { agents, type DbClient, projectAgents } from '@rush/db';
+import type { ProjectAgent as ProjectAgentContract } from '@lux/contracts';
+import { agents, type DbClient, projectAgents } from '@lux/db';
 import { and, asc, eq } from 'drizzle-orm';
 
 type ProjectAgentRow = typeof projectAgents.$inferSelect;

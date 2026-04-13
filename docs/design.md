@@ -1,6 +1,6 @@
-# OpenRush UI Design System
+# Lux UI Design System
 
-> 定义 open-rush Web UI 的视觉语言、组件规范和交互模式。
+> 定义 lux Web UI 的视觉语言、组件规范和交互模式。
 > 第一版目标：**可用的 AI 对话工作台**，不追求花哨，追求清晰、一致、快速。
 
 ## 设计原则

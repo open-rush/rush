@@ -1,6 +1,6 @@
 # Security Baseline — STRIDE Threat Model
 
-OpenRush is a self-hosted AI agent platform. This document maps threats using the STRIDE framework and establishes the security baseline for all phases.
+Lux is a self-hosted AI agent platform. This document maps threats using the STRIDE framework and establishes the security baseline for all phases.
 
 ## System Boundaries
 

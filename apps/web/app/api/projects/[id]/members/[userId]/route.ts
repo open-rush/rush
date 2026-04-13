@@ -1,6 +1,6 @@
-import { UpdateMemberRoleRequest } from '@rush/contracts';
-import { DrizzleMembershipDb, ProjectMemberService } from '@rush/control-plane';
-import { getDbClient } from '@rush/db';
+import { UpdateMemberRoleRequest } from '@lux/contracts';
+import { DrizzleMembershipDb, ProjectMemberService } from '@lux/control-plane';
+import { getDbClient } from '@lux/db';
 
 import { apiError, apiSuccess, getProjectRole, requireAuth } from '@/lib/api-utils';
 

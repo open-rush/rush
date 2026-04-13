@@ -8,8 +8,8 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 
 async function getProjects(userId: string) {
   const { DrizzleAgentConfigStore, DrizzleProjectDb, ProjectAgentService, ProjectService } =
-    await import('@rush/control-plane');
-  const { getDbClient } = await import('@rush/db');
+    await import('@lux/control-plane');
+  const { getDbClient } = await import('@lux/db');
   const db = getDbClient();
   const projectService = new ProjectService(new DrizzleProjectDb(db));
   const projectAgentService = new ProjectAgentService(db);

@@ -1,4 +1,4 @@
-import { getDbClient, users } from '@rush/db';
+import { getDbClient, users } from '@lux/db';
 import { eq } from 'drizzle-orm';
 import type { Session } from 'next-auth';
 import NextAuth from 'next-auth';

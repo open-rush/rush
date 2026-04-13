@@ -1,6 +1,6 @@
-import { UpdateAgentRequest } from '@rush/contracts';
-import { DrizzleAgentConfigStore, ProjectAgentService } from '@rush/control-plane';
-import { agents, getDbClient, projectAgents } from '@rush/db';
+import { UpdateAgentRequest } from '@lux/contracts';
+import { DrizzleAgentConfigStore, ProjectAgentService } from '@lux/control-plane';
+import { agents, getDbClient, projectAgents } from '@lux/db';
 import { and, eq } from 'drizzle-orm';
 
 import {

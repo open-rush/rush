@@ -5,7 +5,7 @@
  * POST: Save messages for a conversation (used by auto-save)
  */
 
-import { conversations, getDbClient, messages as messagesTable } from '@rush/db';
+import { conversations, getDbClient, messages as messagesTable } from '@lux/db';
 import { eq } from 'drizzle-orm';
 import { apiError, apiSuccess, requireAuth } from '@/lib/api-utils';
 

@@ -1,4 +1,4 @@
-import { conversations, type DbClient } from '@rush/db';
+import { conversations, type DbClient } from '@lux/db';
 import { desc, eq } from 'drizzle-orm';
 
 import type {

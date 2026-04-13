@@ -1,4 +1,4 @@
-import type { Agent } from '@rush/contracts';
+import type { Agent } from '@lux/contracts';
 
 export interface AgentFormState {
   name: string;

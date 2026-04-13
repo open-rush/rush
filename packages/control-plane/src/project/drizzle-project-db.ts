@@ -1,4 +1,4 @@
-import { type DbClient, projectMembers, projects } from '@rush/db';
+import { type DbClient, projectMembers, projects } from '@lux/db';
 import { and, desc, eq, isNotNull, isNull, or } from 'drizzle-orm';
 
 import type {

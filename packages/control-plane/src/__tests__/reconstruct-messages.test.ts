@@ -1,4 +1,4 @@
-import type { RunEvent } from '@rush/contracts';
+import type { RunEvent } from '@lux/contracts';
 import { describe, expect, it } from 'vitest';
 import { reconstructMessages } from '../conversation/reconstruct-messages.js';
 

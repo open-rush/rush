@@ -1,5 +1,5 @@
-import { DrizzleProjectDb, ProjectService } from '@rush/control-plane';
-import { getDbClient } from '@rush/db';
+import { DrizzleProjectDb, ProjectService } from '@lux/control-plane';
+import { getDbClient } from '@lux/db';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { AppShell } from '@/components/layout/app-shell';

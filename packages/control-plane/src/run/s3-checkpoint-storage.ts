@@ -2,7 +2,7 @@ import type { CheckpointStorage } from './checkpoint-service.js';
 
 /**
  * S3-backed checkpoint storage adapter.
- * Wraps any object that has upload/download methods (e.g. @rush/integrations StorageService).
+ * Wraps any object that has upload/download methods (e.g. @lux/integrations StorageService).
  */
 export interface S3StorageAdapter {
   upload(key: string, body: Buffer | Uint8Array, options?: { contentType?: string }): Promise<void>;

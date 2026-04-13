@@ -55,14 +55,18 @@ export default function ChatPage() {
         ? fetch(`/api/agents/${encodeURIComponent(agentId)}`).then((r) => (r.ok ? r.json() : null))
         : null,
       fetch('/api/health').then((r) => (r.ok ? r.json() : null)),
-    ]).then(([agentJson, healthJson]) => {
-      if (cancelled) return;
-      const runtime = runtimeLabels[agentJson?.data?.providerType] ?? 'Claude Code';
-      const backend = backendLabels[healthJson?.provider] ?? '';
-      setProviderLabel(backend ? `${runtime} · ${backend}` : runtime);
-    }).catch(() => {});
+    ])
+      .then(([agentJson, healthJson]) => {
+        if (cancelled) return;
+        const runtime = runtimeLabels[agentJson?.data?.providerType] ?? 'Claude Code';
+        const backend = backendLabels[healthJson?.provider] ?? '';
+        setProviderLabel(backend ? `${runtime} · ${backend}` : runtime);
+      })
+      .catch(() => {});
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [agentId]);
 
   // ---------------------------------------------------------------------------
@@ -318,9 +322,7 @@ export default function ChatPage() {
                   </kbd>{' '}
                   send
                 </span>
-                <span className="text-[10px] font-mono text-muted-foreground">
-                  {providerLabel}
-                </span>
+                <span className="text-[10px] font-mono text-muted-foreground">{providerLabel}</span>
               </div>
             </div>
           </div>

@@ -29,7 +29,7 @@ Checkpoint 失败不阻塞 finalization（non-fatal，日志告警）。
 ## 存储层
 
 - **DrizzleCheckpointDb**: run_checkpoints 表的 Drizzle 实现
-- **S3CheckpointStorage**: 适配 @rush/integrations StorageService → CheckpointStorage 接口
+- **S3CheckpointStorage**: 适配 @lux/integrations StorageService → CheckpointStorage 接口
   - Key 格式: `checkpoints/{runId}/{timestamp}-messages.json`
 
 ## 后续增强（TODO）

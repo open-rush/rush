@@ -1,5 +1,5 @@
 {
-  "name": "@rush/control-plane",
+  "name": "@lux/control-plane",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -18,9 +18,9 @@
     "clean": "rm -rf dist node_modules coverage"
   },
   "dependencies": {
-    "@rush/contracts": "workspace:*",
-    "@rush/db": "workspace:*",
-    "@rush/sandbox": "workspace:*",
+    "@lux/contracts": "workspace:*",
+    "@lux/db": "workspace:*",
+    "@lux/sandbox": "workspace:*",
     "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
-import { CreateProjectRequest } from '@rush/contracts';
-import { DrizzleProjectDb, ProjectService } from '@rush/control-plane';
-import { getDbClient, projectMembers, projects } from '@rush/db';
+import { CreateProjectRequest } from '@lux/contracts';
+import { DrizzleProjectDb, ProjectService } from '@lux/control-plane';
+import { getDbClient, projectMembers, projects } from '@lux/db';
 
 import { apiError, apiSuccess, requireAuth } from '@/lib/api-utils';
 

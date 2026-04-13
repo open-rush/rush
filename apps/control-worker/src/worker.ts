@@ -5,9 +5,9 @@ import {
   InMemoryEventStore,
   RunOrchestrator,
   RunService,
-} from '@rush/control-plane';
-import { closeDbClient, getDbClient } from '@rush/db';
-import { OpenSandboxProvider } from '@rush/sandbox';
+} from '@lux/control-plane';
+import { closeDbClient, getDbClient } from '@lux/db';
+import { OpenSandboxProvider } from '@lux/sandbox';
 import { PgBoss } from 'pg-boss';
 
 const DATABASE_URL = process.env.DATABASE_URL ?? 'postgresql://rush:rush@localhost:5432/rush';

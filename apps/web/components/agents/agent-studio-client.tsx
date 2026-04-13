@@ -1,6 +1,6 @@
 'use client';
 
-import type { Agent } from '@rush/contracts';
+import type { Agent } from '@lux/contracts';
 import { Bot, Cpu, Loader2, Pencil, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';

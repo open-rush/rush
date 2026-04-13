@@ -1,5 +1,5 @@
 {
-  "name": "@rush/control-worker",
+  "name": "@lux/control-worker",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,11 +13,11 @@
     "clean": "rm -rf dist node_modules coverage"
   },
   "dependencies": {
-    "@rush/contracts": "workspace:*",
-    "@rush/control-plane": "workspace:*",
-    "@rush/db": "workspace:*",
-    "@rush/sandbox": "workspace:*",
-    "@rush/stream": "workspace:*",
+    "@lux/contracts": "workspace:*",
+    "@lux/control-plane": "workspace:*",
+    "@lux/db": "workspace:*",
+    "@lux/sandbox": "workspace:*",
+    "@lux/stream": "workspace:*",
     "pg-boss": "^12.15.0"
   },
   "devDependencies": {

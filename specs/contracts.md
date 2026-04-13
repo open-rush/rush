@@ -1,6 +1,6 @@
 # Contracts Specification
 
-packages/contracts 定义 OpenRush 平台所有核心数据类型的 Zod schema。零运行时依赖（仅 Zod）。
+packages/contracts 定义 Lux 平台所有核心数据类型的 Zod schema。零运行时依赖（仅 Zod）。
 
 ## 设计原则
 

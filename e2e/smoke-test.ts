@@ -14,9 +14,9 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import path from 'node:path';
 
-import { DrizzleRunDb, InMemoryEventStore, RunOrchestrator, RunService } from '@rush/control-plane';
-import { agents, closeDbClient, getDbClient, projects, runEvents, runs, users } from '@rush/db';
-import type { CreateSandboxOptions, SandboxInfo, SandboxProvider } from '@rush/sandbox';
+import { DrizzleRunDb, InMemoryEventStore, RunOrchestrator, RunService } from '@lux/control-plane';
+import { agents, closeDbClient, getDbClient, projects, runEvents, runs, users } from '@lux/db';
+import type { CreateSandboxOptions, SandboxInfo, SandboxProvider } from '@lux/sandbox';
 import { eq } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ function startAgentWorker(): ChildProcess {
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<number> {
-  console.log('\n=== OpenRush E2E Smoke Test ===\n');
+  console.log('\n=== Lux E2E Smoke Test ===\n');
 
   // Track IDs for cleanup
   let userId: string | undefined;

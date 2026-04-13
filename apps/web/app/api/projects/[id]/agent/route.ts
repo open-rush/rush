@@ -1,6 +1,6 @@
-import { SetCurrentProjectAgentRequest } from '@rush/contracts';
-import { DrizzleAgentConfigStore, ProjectAgentService } from '@rush/control-plane';
-import { getDbClient } from '@rush/db';
+import { SetCurrentProjectAgentRequest } from '@lux/contracts';
+import { DrizzleAgentConfigStore, ProjectAgentService } from '@lux/control-plane';
+import { getDbClient } from '@lux/db';
 
 import {
   apiError,

@@ -91,7 +91,7 @@ export function Sidebar({ user }: SidebarProps) {
         <div className="size-7 bg-primary rounded-lg flex items-center justify-center text-primary-foreground text-xs font-bold">
           R
         </div>
-        <span className="text-[15px] font-semibold tracking-tight">OpenRush</span>
+        <span className="text-[15px] font-semibold tracking-tight">Lux</span>
         <span className="ml-auto text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
           v0.3
         </span>

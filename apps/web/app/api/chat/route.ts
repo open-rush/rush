@@ -57,7 +57,7 @@ const model = claudeCode(modelId, {
 function errorResponse(error: string, status: number, details?: unknown): Response {
   return Response.json(
     { error, timestamp: new Date().toISOString(), ...(details ? { details } : {}) },
-    { status },
+    { status }
   );
 }
 

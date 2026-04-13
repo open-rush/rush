@@ -1,6 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
-import * as schema from '@rush/db';
-import { agents, projects, runs, users } from '@rush/db';
+import * as schema from '@lux/db';
+import { agents, projects, runs, users } from '@lux/db';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';

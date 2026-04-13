@@ -1,4 +1,4 @@
-import type { ProjectMemberRole } from '@rush/contracts';
+import type { ProjectMemberRole } from '@lux/contracts';
 import type { MembershipInfo, MembershipStore } from './authorization.js';
 
 export interface MemberRecord {

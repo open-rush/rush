@@ -1,9 +1,9 @@
-# OpenRush Documentation
+# Lux Documentation
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/open-rush/rush.git
+git clone https://github.com/open-rush/lux.git
 cd rush
 pnpm install
 docker compose -f docker/docker-compose.dev.yml up -d

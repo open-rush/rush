@@ -40,7 +40,7 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-lg font-semibold mb-2">OpenRush</h2>
+          <h2 className="text-lg font-semibold mb-2">Lux</h2>
           <p className="text-sm text-muted-foreground">Start a conversation with the AI agent.</p>
         </div>
       </div>

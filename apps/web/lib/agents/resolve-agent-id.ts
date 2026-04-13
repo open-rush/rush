@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { DrizzleAgentConfigStore, ProjectAgentService } from '@rush/control-plane';
-import type { DbClient } from '@rush/db';
+import { DrizzleAgentConfigStore, ProjectAgentService } from '@lux/control-plane';
+import type { DbClient } from '@lux/db';
 
 const DEFAULT_AGENT = {
   name: 'Web Builder',

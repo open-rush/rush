@@ -10,9 +10,9 @@ All migrations are generated and managed by `drizzle-kit`. Hand-written SQL is a
 
 ```
 1. Edit schema in packages/db/src/schema/
-2. Generate: pnpm --filter @rush/db db:generate (auto-builds before generating)
+2. Generate: pnpm --filter @lux/db db:generate (auto-builds before generating)
 3. Review the generated SQL in packages/db/drizzle/
-4. Test: pnpm --filter @rush/db test (PGlite) + test:integration (Docker)
+4. Test: pnpm --filter @lux/db test (PGlite) + test:integration (Docker)
 5. Commit schema + migration together
 ```
 
@@ -46,7 +46,7 @@ CI runs migrations on a clean database to verify the migration chain is replayab
 # In CI: start fresh PG, apply all migrations, verify schema
 docker run --rm -e POSTGRES_DB=rush -e POSTGRES_USER=rush -e POSTGRES_PASSWORD=rush \
   pgvector/pgvector:pg16 &
-DATABASE_URL=postgresql://rush:rush@localhost:5432/rush pnpm --filter @rush/db db:migrate
+DATABASE_URL=postgresql://rush:rush@localhost:5432/rush pnpm --filter @lux/db db:migrate
 ```
 
 ### Production Backup
@@ -57,7 +57,7 @@ Before running migrations in production:
 pg_dump -Fc $DATABASE_URL > backup-$(date +%Y%m%d-%H%M%S).dump
 ```
 
-This is the operator's responsibility, not automated by OpenRush (self-hosted = operator controls infrastructure).
+This is the operator's responsibility, not automated by Lux (self-hosted = operator controls infrastructure).
 
 ### Required PostgreSQL Extensions
 

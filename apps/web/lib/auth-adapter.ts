@@ -6,8 +6,8 @@
  * This adapter bridges the gap without touching the DB schema.
  */
 
-import type { DbClient } from '@rush/db';
-import { accounts, sessions, users, verificationTokens } from '@rush/db';
+import type { DbClient } from '@lux/db';
+import { accounts, sessions, users, verificationTokens } from '@lux/db';
 import { and, eq } from 'drizzle-orm';
 import type { Adapter, AdapterSession, AdapterUser } from 'next-auth/adapters';
 

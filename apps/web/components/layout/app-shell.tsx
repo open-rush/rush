@@ -44,7 +44,7 @@ export function AppShell({ user, projects = [], children }: AppShellProps) {
             R
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">OpenRush</div>
+            <div className="text-sm font-semibold truncate">Lux</div>
             <div className="text-[11px] text-muted-foreground truncate">{user.name ?? 'User'}</div>
           </div>
         </div>

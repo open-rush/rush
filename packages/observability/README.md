@@ -1,6 +1,6 @@
-# @rush/observability
+# @lux/observability
 
-Structured logging and request context propagation for OpenRush's 3-layer architecture.
+Structured logging and request context propagation for Lux's 3-layer architecture.
 
 ## What it Does
 
@@ -12,7 +12,7 @@ Structured logging and request context propagation for OpenRush's 3-layer archit
 ## Usage
 
 ```typescript
-import { createLogger, withRequestContext, getRequestContext } from '@rush/observability';
+import { createLogger, withRequestContext, getRequestContext } from '@lux/observability';
 
 // Create a logger — JSON in production, pretty in development
 const logger = createLogger({ service: 'control-worker' });
@@ -26,7 +26,7 @@ withRequestContext({ requestId: 'req-123', service: 'control-worker', runId: 'ru
 ### Next.js Route Handler
 
 ```typescript
-import { withNextRouteContext } from '@rush/observability';
+import { withNextRouteContext } from '@lux/observability';
 
 export const GET = withNextRouteContext('web', async (request) => {
   // requestId is automatically extracted from x-request-id header or generated
@@ -38,7 +38,7 @@ export const GET = withNextRouteContext('web', async (request) => {
 ### Hono Middleware
 
 ```typescript
-import { createHonoMiddleware } from '@rush/observability/hono';
+import { createHonoMiddleware } from '@lux/observability/hono';
 
 app.use('*', createHonoMiddleware('agent-worker'));
 ```
@@ -47,12 +47,12 @@ app.use('*', createHonoMiddleware('agent-worker'));
 
 ```typescript
 // Producer (web → control-worker)
-import { getRequestContext } from '@rush/observability';
+import { getRequestContext } from '@lux/observability';
 const ctx = getRequestContext();
 pgBoss.send('run:execute', { runId, __ctx: { requestId: ctx?.requestId } });
 
 // Consumer (control-worker)
-import { withRequestContext, extractOrGenerateRequestId } from '@rush/observability';
+import { withRequestContext, extractOrGenerateRequestId } from '@lux/observability';
 pgBoss.work('run:execute', async (job) => {
   const requestId = extractOrGenerateRequestId(job.data.__ctx?.requestId);
   await withRequestContext({ requestId, service: 'control-worker' }, async () => {
@@ -77,4 +77,4 @@ Sensitive fields are automatically redacted in logs: `authorization`, `cookie`, 
 
 - `pino` — JSON logger
 - `pino-pretty` (dev) — pretty-print for development
-- `hono` (optional peer) — only needed for `@rush/observability/hono`
+- `hono` (optional peer) — only needed for `@lux/observability/hono`

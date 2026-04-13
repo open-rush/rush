@@ -5,7 +5,7 @@
 
 ## 概述
 
-OpenRush Web UI 是基于 Next.js 16 的 AI 对话工作台。使用 AI SDK v6 的 `useChat` hook (from `@ai-sdk/react`) + `TextStreamChatTransport` 实现流式对话。UI 组件为 Tailwind-only 轻量实现（无 Radix/shadcn 依赖）。
+Lux Web UI 是基于 Next.js 16 的 AI 对话工作台。使用 AI SDK v6 的 `useChat` hook (from `@ai-sdk/react`) + `TextStreamChatTransport` 实现流式对话。UI 组件为 Tailwind-only 轻量实现（无 Radix/shadcn 依赖）。
 
 ## 设计参考
 

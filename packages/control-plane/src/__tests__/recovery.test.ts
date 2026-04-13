@@ -1,4 +1,4 @@
-import type { CreateSandboxOptions, SandboxInfo, SandboxProvider } from '@rush/sandbox';
+import type { CreateSandboxOptions, SandboxInfo, SandboxProvider } from '@lux/sandbox';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InMemoryEventStore } from '../event-store.js';
 import type { Checkpoint, CheckpointDb, CheckpointStorage } from '../run/checkpoint-service.js';

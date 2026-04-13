@@ -13,7 +13,7 @@ export async function GET() {
   return Response.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    service: 'rush-web',
+    service: 'lux-web',
     provider: getProviderBackend(),
   });
 }
