@@ -30,7 +30,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const registry = getRegistry();
   const servers = await registry.getServersForProject(projectId, userId);
-  return apiSuccess(servers);
+  // Redact env values to prevent credential leakage
+  const redacted = servers.map((s) => ({
+    ...s,
+    env: s.env ? Object.fromEntries(Object.keys(s.env).map((k) => [k, '***'])) : undefined,
+  }));
+  return apiSuccess(redacted);
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -56,6 +61,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (!body.name || !body.transport) {
     return apiError(400, 'VALIDATION_ERROR', 'name and transport are required');
+  }
+  const validTransports = ['stdio', 'sse', 'streamable-http'];
+  if (!validTransports.includes(body.transport)) {
+    return apiError(
+      400,
+      'VALIDATION_ERROR',
+      `transport must be one of: ${validTransports.join(', ')}`
+    );
   }
 
   const config: McpServerConfig = {

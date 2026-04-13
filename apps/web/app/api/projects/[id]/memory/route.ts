@@ -9,8 +9,9 @@ import { apiError, apiSuccess, requireAuth, verifyProjectAccess } from '@/lib/ap
 const stubEmbedding = {
   dimensions: 768,
   async embed(_text: string): Promise<number[]> {
-    // Return zero vector; real implementation calls an embedding API
-    return new Array(768).fill(0);
+    // TODO: replace with real embedding API (Anthropic, OpenAI, Zhipu)
+    // Return empty array to skip vector storage until a real provider is configured
+    return [];
   },
 };
 
@@ -44,7 +45,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       agentId,
       projectId,
       query,
-      limit: Number(url.searchParams.get('limit')) || 10,
+      limit: Math.min(Math.max(Number(url.searchParams.get('limit')) || 10, 1), 100),
     };
     const results = await store.search(options);
     return apiSuccess(results);
@@ -107,10 +108,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!memoryId) return apiError(400, 'VALIDATION_ERROR', 'memoryId query param is required');
 
   const store = getMemoryStore();
-  try {
-    await store.remove(memoryId);
-  } catch {
+  const entry = await store.getById(memoryId);
+  if (!entry || entry.projectId !== projectId) {
     return apiError(404, 'NOT_FOUND', 'Memory entry not found');
   }
+  await store.remove(memoryId);
   return apiSuccess({ deleted: true });
 }

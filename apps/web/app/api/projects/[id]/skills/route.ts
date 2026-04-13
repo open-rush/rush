@@ -84,6 +84,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!name) return apiError(400, 'VALIDATION_ERROR', 'name query param is required');
 
   const manager = getSkillManager();
-  await manager.uninstallFromProject(projectId, name);
+  try {
+    await manager.uninstallFromProject(projectId, name);
+  } catch {
+    return apiError(404, 'NOT_FOUND', 'Skill not found');
+  }
   return apiSuccess({ deleted: true });
 }
