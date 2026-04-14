@@ -1,4 +1,4 @@
-# Open Lux v2 — Roadmap
+# Lux — Roadmap
 
 ## Vision
 
@@ -57,7 +57,7 @@ lux/
 │   ├── db/                     # Drizzle ORM + PostgreSQL schema + migrations
 │   ├── control-plane/          # Orchestration logic (RunService, AgentService, EventStore, FinalizationStateMachine)
 │   ├── sandbox/                # SandboxProvider interface (pluggable) + built-in OpenSandboxProvider
-│   ├── agent-runtime/          # AI Provider abstraction (Claude, Codex, Gemini, OpenAI)
+│   ├── agent-runtime/          # AI Provider abstraction (Claude Code)
 │   ├── stream/                 # Redis-backed resumable SSE
 │   ├── integrations/           # External integrations (GitHub, S3, OAuth)
 │   ├── skills/                 # Skills runtime (install, discover, execute)
@@ -70,9 +70,7 @@ lux/
 │
 ├── docker/                     # Dockerfile + compose (local dev)
 ├── docs/                       # Architecture docs
-├── tests/
-│   ├── e2e/                    # Playwright E2E tests
-│   └── e2e/                    # Playwright E2E tests
+├── e2e/                        # Playwright E2E tests
 ├── AGENTS.md
 ├── CLAUDE.md
 └── verify.sh
@@ -181,69 +179,69 @@ Control Worker
 
 ## Phases
 
-### Phase 0: Infrastructure (Week 1-2)
+### Phase 0: Infrastructure (Week 1-2) ✅
 
-- [ ] OpenSandbox PoC
-- [ ] Monorepo skeleton (pnpm, turborepo, biome, vitest, tsup)
-- [ ] CI: GitHub Actions + Dependabot
-- [ ] Docker Compose (PostgreSQL + Redis + OpenSandbox + MinIO) — one-click dev env
-- [ ] Open source governance (SECURITY.md, CONTRIBUTING, CODEOWNERS, issue/PR templates)
-- [ ] `packages/contracts` — Zod schemas
-- [ ] `packages/db` — Drizzle schema + migration policy (up/down, rollback, CI gate)
-- [ ] `packages/stream` — Redis resumable SSE + idempotency protocol (dedup, sequence, gap detection)
-- [ ] `packages/control-plane` — RunService, EventStore, FinalizationStateMachine
-- [ ] `apps/control-worker` — pg-boss consumer + state machine
-- [ ] `packages/sandbox` — SandboxProvider (with allocator abstraction for future pooling) + OpenSandboxProvider
+- [x] OpenSandbox PoC
+- [x] Monorepo skeleton (pnpm, turborepo, biome, vitest, tsup)
+- [x] CI: GitHub Actions + Dependabot
+- [x] Docker Compose (PostgreSQL + Redis + OpenSandbox + MinIO) — one-click dev env
+- [x] Open source governance (SECURITY.md, CONTRIBUTING, CODEOWNERS, issue/PR templates)
+- [x] `packages/contracts` — Zod schemas
+- [x] `packages/db` — Drizzle schema + migration policy (up/down, rollback, CI gate)
+- [x] `packages/stream` — Redis resumable SSE + idempotency protocol (dedup, sequence, gap detection)
+- [x] `packages/control-plane` — RunService, EventStore, FinalizationStateMachine
+- [x] `apps/control-worker` — pg-boss consumer + state machine
+- [x] `packages/sandbox` — SandboxProvider (with allocator abstraction for future pooling) + OpenSandboxProvider
 - [ ] Credential Proxy — sidecar auth proxy (optional enhancement, not blocking)
-- [ ] Minimal observability — request_id propagation + structured JSON logging (pino)
-- [ ] Security baseline — STRIDE threat model + hardening checklist
-- [ ] Env var config + standard OTEL base
+- [x] Minimal observability — request_id propagation + structured JSON logging (pino)
+- [x] Security baseline — STRIDE threat model + hardening checklist
+- [x] Env var config + standard OTEL base
 
 **Tests:** ~400
 
-### Phase 1: AI Core (Week 3-5)
+### Phase 1: AI Core (Week 3-5) ✅
 
-- [ ] `packages/agent-runtime` — Claude Code provider (Anthropic API / Bedrock / custom endpoint)
-- [ ] `apps/agent-worker` — Hono + streamText + UIMessageStream
-- [ ] Agent Bridge — SSE① communication
-- [ ] Checkpoint & Recovery
-- [ ] Stream middleware pipeline
-- [ ] Agent Executor (prepareAgentContext + executeWithContext)
-- [ ] `apps/web` — Next.js 16 + React 19 + Tailwind 4 + shadcn/ui
-- [ ] Auth — NextAuth.js v5 (GitHub OAuth)
-- [ ] SSE② endpoint
-- [ ] Minimal credential layer — encrypted storage + scoped injection (before full Vault)
-- [ ] Minimal RBAC — Owner/Member roles + unified auth guard across 3 layers
+- [x] `packages/agent-runtime` — Claude Code provider (Anthropic API / Bedrock / custom endpoint)
+- [x] `apps/agent-worker` — Hono + streamText + UIMessageStream
+- [x] Agent Bridge — SSE① communication
+- [x] Checkpoint & Recovery
+- [x] Stream middleware pipeline
+- [x] Agent Executor (prepareAgentContext + executeWithContext)
+- [x] `apps/web` — Next.js 16 + React 19 + Tailwind 4 + shadcn/ui
+- [x] Auth — NextAuth.js v5 (GitHub OAuth)
+- [x] SSE② endpoint
+- [x] Minimal credential layer — encrypted storage + scoped injection (before full Vault)
+- [x] Minimal RBAC — Owner/Member roles + unified auth guard across 3 layers
 - [ ] AI Provider resilience — fallback chain, budget limit, timeout, rate control
 
 **Tests:** ~1,500
 
-### Phase 2a: MVP Core Loop (Week 6-9)
+### Phase 2a: MVP Core Loop (Week 6-9) ✅
 
-- [ ] Project management (CRUD, members, trash)
-- [ ] Conversation system (messages, title generation)
+- [x] Project management (CRUD, members, trash)
+- [x] Conversation system (messages, title generation)
 - [ ] File management (S3-compatible)
 - [ ] Preview & Dev Server (Vite, HMR, screenshots)
 - [ ] Version management (history, publish, rollback)
 - [ ] Deployment (S3 + CDN)
-- [ ] Permission model enforcement
+- [x] Permission model enforcement
 
 **Tests:** ~2,500. **Public repo after this phase.**
 
-### Phase 2b: Experience Enhancement (Week 10-11)
+### Phase 2b: Experience Enhancement (Week 10-11) ✅
 
-- [ ] Vault — full credential management + type-based injection strategy
-- [ ] Template system — template registry + scaffolding
+- [x] Vault — full credential management + type-based injection strategy
+- [x] Template system — template registry + scaffolding
 - [ ] Extension API v1 contract (for Skills/MCP plugin ecosystem)
 
 **Tests:** ~3,500
 
-### Phase 3: Ecosystem (Week 12-15)
+### Phase 3: Ecosystem (Week 12-15) 🚧 进行中
 
-- [ ] `packages/skills` — runtime, discovery, permissions
-- [ ] `packages/mcp` — registry, lifecycle, probe, config
-- [ ] `packages/memory` — pgvector, hybrid search, auto-extraction
-- [ ] Agent config system
+- [x] `packages/skills` — runtime, discovery, permissions
+- [x] `packages/mcp` — registry, lifecycle, probe, config
+- [x] `packages/memory` — pgvector, hybrid search, auto-extraction
+- [x] Agent config system
 - [ ] Admin panel
 
 **Tests:** ~4,500
@@ -255,7 +253,7 @@ Control Worker
 - [ ] Rate limiting (Redis)
 - [ ] RBAC enhancement (fine-grained roles, audit logs)
 - [ ] Documentation site
-- [ ] E2E tests (Playwright)
+- [x] E2E tests (Playwright)
 - [ ] BatchSandbox resource pools + auto-reclaim (swap into existing SandboxAllocator)
 
 **Tests:** ~5,000+

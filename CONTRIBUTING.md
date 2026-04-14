@@ -15,7 +15,7 @@ Thanks for your interest in contributing to Lux! This guide covers everything yo
 ```bash
 # Clone the repo
 git clone https://github.com/rush-open/lux.git
-cd rush
+cd lux
 
 # Install dependencies
 pnpm install

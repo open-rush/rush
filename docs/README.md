@@ -4,7 +4,7 @@
 
 ```bash
 git clone https://github.com/rush-open/lux.git
-cd rush
+cd lux
 pnpm install
 docker compose -f docker/docker-compose.dev.yml up -d
 pnpm build
@@ -36,10 +36,6 @@ Browser → apps/web (Next.js) → apps/control-worker (pg-boss) → apps/agent-
 | skills | reskill-based skill management |
 | mcp | MCP server registry |
 | memory | pgvector + hybrid search |
-
-## API Reference
-
-API documentation will be generated from the TypeScript types when the web layer is implemented.
 
 ## Contributing
 
