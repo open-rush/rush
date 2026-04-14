@@ -6,8 +6,11 @@
 
 import { convertToModelMessages, streamText, type UIMessage } from 'ai';
 import { claudeCode } from 'ai-sdk-provider-claude-code';
+import { createLogger } from '@lux/observability';
 import { registerAbortController, unregisterAbortController } from '@/lib/ai/stream-abort-registry';
 import { requireAuth } from '@/lib/api-utils';
+
+const logger = createLogger({ service: 'web:chat-api' });
 
 export const maxDuration = 300;
 
@@ -74,9 +77,17 @@ function classifyStreamError(error: unknown): 'aborted' | '429' | 'unknown' {
 // ---------------------------------------------------------------------------
 
 export async function POST(req: Request) {
+  const requestId = req.headers.get('x-request-id') || `chat-${Date.now()}`;
+
+  logger.info({ requestId }, '📨 Chat API request received');
+
+  // Auth
+  let userId: string;
   try {
-    await requireAuth();
+    userId = await requireAuth();
+    logger.info({ requestId, userId }, '✅ Auth successful');
   } catch (res) {
+    logger.warn({ requestId }, '🚫 Auth failed');
     return res as Response;
   }
 
@@ -84,13 +95,15 @@ export async function POST(req: Request) {
   let body: Record<string, unknown>;
   try {
     body = await req.json();
-  } catch {
+  } catch (err) {
+    logger.error({ requestId, error: err }, '❌ Invalid JSON in request body');
     return errorResponse('Invalid JSON in request body', 400);
   }
 
   // 2. Validate
   const messages = body.messages;
   if (!Array.isArray(messages) || messages.length === 0) {
+    logger.warn({ requestId }, '⚠️ No messages provided');
     return errorResponse('At least one message is required', 422);
   }
 
@@ -98,15 +111,34 @@ export async function POST(req: Request) {
   const conversationId = typeof body.conversationId === 'string' ? body.conversationId : undefined;
   const abortKey = conversationId ?? projectId ?? `req-${Date.now()}`;
 
+  logger.info(
+    {
+      requestId,
+      userId,
+      projectId,
+      conversationId,
+      messagesCount: messages.length,
+      abortKey,
+    },
+    '📝 Chat request validated'
+  );
+
   // 3. AbortController
   const abortController = new AbortController();
   registerAbortController(abortKey, abortController);
+  logger.info({ requestId, abortKey }, '🎯 AbortController registered');
 
   try {
     // 4. Convert UIMessage → CoreMessage
+    logger.info({ requestId, messagesCount: messages.length }, '🔄 Converting messages...');
     const modelMessages = await convertToModelMessages(messages as UIMessage[]);
+    logger.info(
+      { requestId, modelMessagesCount: modelMessages.length },
+      '✅ Messages converted successfully'
+    );
 
     // 5. Stream
+    logger.info({ requestId, modelId }, '🚀 Starting streamText...');
     const result = streamText({
       model,
       messages: modelMessages,
@@ -115,15 +147,33 @@ export async function POST(req: Request) {
 
     // 6. Return UIMessageStream — clean up abort registry when stream finishes
     const response = result.toUIMessageStreamResponse();
+    logger.info({ requestId }, '✅ Stream response created, returning to client');
+
     result.usage.then(
-      () => unregisterAbortController(abortKey, abortController),
-      () => unregisterAbortController(abortKey, abortController)
+      (usage) => {
+        logger.info({ requestId, usage }, '✅ Stream completed successfully');
+        unregisterAbortController(abortKey, abortController);
+      },
+      (err) => {
+        logger.error({ requestId, error: err }, '❌ Stream failed');
+        unregisterAbortController(abortKey, abortController);
+      }
     );
     return response;
   } catch (error) {
     unregisterAbortController(abortKey, abortController);
 
     const errorType = classifyStreamError(error);
+    logger.error(
+      {
+        requestId,
+        errorType,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      '❌ Chat API error'
+    );
+
     if (errorType === 'aborted') {
       return errorResponse('Stream aborted', 499);
     }
@@ -131,7 +181,6 @@ export async function POST(req: Request) {
       return errorResponse('Rate limited — please try again later', 429);
     }
 
-    console.error('[Chat API] Error:', error);
     return errorResponse(
       'Failed to process message',
       500,

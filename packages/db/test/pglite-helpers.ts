@@ -190,6 +190,12 @@ async function applySchema(db: TestDb): Promise<void> {
   await db.execute(sql`
     CREATE INDEX IF NOT EXISTS tasks_status_idx ON tasks (status)
   `);
+  await db.execute(sql`
+    CREATE INDEX IF NOT EXISTS tasks_head_run_id_idx ON tasks (head_run_id)
+  `);
+  await db.execute(sql`
+    CREATE INDEX IF NOT EXISTS tasks_active_run_id_idx ON tasks (active_run_id)
+  `);
 
   // Conversations
   await db.execute(sql`

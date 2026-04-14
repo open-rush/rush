@@ -21,7 +21,7 @@ export interface UseStreamHeartbeatOptions {
 export function useStreamHeartbeat(
   projectId: string | undefined,
   status: string,
-  _isDisconnect: boolean,
+  isDisconnect: boolean,
   resumeStream: (() => void) | undefined,
   options?: UseStreamHeartbeatOptions
 ): void {
@@ -83,15 +83,15 @@ export function useStreamHeartbeat(
       return;
     }
 
-    // Start heartbeat when status goes from active → ready (possible disconnect)
+    // Only attempt resume after an explicit disconnect signal.
     const wasActive = prev === 'streaming' || prev === 'submitted' || prev === 'error';
-    if (status === 'ready' && wasActive) {
+    if (status === 'ready' && wasActive && isDisconnect) {
       startHeartbeat();
     } else if (status === 'streaming' || status === 'submitted') {
       // Connection re-established, stop heartbeat
       stopHeartbeat();
     }
-  }, [status, enabled, projectId, startHeartbeat, stopHeartbeat]);
+  }, [status, enabled, projectId, isDisconnect, startHeartbeat, stopHeartbeat]);
 
   // Cleanup
   useEffect(() => {

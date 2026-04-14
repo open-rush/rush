@@ -20,6 +20,7 @@ export {
   skillStars,
 } from './skill-registry.js';
 export { skills } from './skills.js';
+export { tasks } from './tasks.js';
 export { userMemories } from './user-memories.js';
 export { users } from './users.js';
 export { vaultEntries } from './vault-entries.js';

@@ -7,16 +7,19 @@ import {
   createTestProject,
   createTestRun,
   createTestRunEvent,
+  createTestTask,
   createTestUser,
 } from '../../test/factories.js';
 import { closeTestDb, createTestDb, type TestDb, truncateAll } from '../../test/pglite-helpers.js';
 import {
   accounts,
   agents,
+  conversations,
   projectAgents,
   projectMembers,
   runEvents,
   runs,
+  tasks,
   users,
   vaultEntries,
 } from '../schema/index.js';
@@ -94,6 +97,26 @@ describe('projects + members', () => {
   });
 });
 
+describe('tasks', () => {
+  it('creates a task linked to project, agent, and user', async () => {
+    const user = await createTestUser(db);
+    const project = await createTestProject(db, user.id);
+    const agent = await createTestAgent(db, project.id, user.id);
+    const task = await createTestTask(db, project.id, user.id, {
+      agentId: agent.id,
+      title: 'Implement auth',
+    });
+
+    expect(task.projectId).toBe(project.id);
+    expect(task.agentId).toBe(agent.id);
+    expect(task.createdBy).toBe(user.id);
+    expect(task.title).toBe('Implement auth');
+
+    const [found] = await db.select().from(tasks).where(eq(tasks.id, task.id));
+    expect(found.status).toBe('active');
+  });
+});
+
 describe('agent → run → run_events chain', () => {
   it('creates full lifecycle chain', async () => {
     const user = await createTestUser(db);
@@ -132,6 +155,31 @@ describe('agent → run → run_events chain', () => {
     const remainingEvents = await db.select().from(runEvents).where(eq(runEvents.runId, run.id));
     expect(remainingRuns).toHaveLength(0);
     expect(remainingEvents).toHaveLength(0);
+  });
+
+  it('links runs to task and conversation when provided', async () => {
+    const user = await createTestUser(db);
+    const project = await createTestProject(db, user.id);
+    const agent = await createTestAgent(db, project.id, user.id);
+    const task = await createTestTask(db, project.id, user.id, { agentId: agent.id });
+    const [conversation] = await db
+      .insert(conversations)
+      .values({
+        projectId: project.id,
+        taskId: task.id,
+        agentId: agent.id,
+        userId: user.id,
+        title: 'Task chat',
+      })
+      .returning();
+    const run = await createTestRun(db, agent.id, {
+      prompt: 'Continue task',
+      taskId: task.id,
+      conversationId: conversation.id,
+    });
+
+    expect(run.taskId).toBe(task.id);
+    expect(run.conversationId).toBe(conversation.id);
   });
 });
 

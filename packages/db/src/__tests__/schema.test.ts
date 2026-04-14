@@ -12,6 +12,7 @@ import {
   runs,
   sandboxes,
   sessions,
+  tasks,
   users,
   vaultEntries,
   verificationTokens,
@@ -26,6 +27,7 @@ const ALL_TABLES = {
   projectAgents,
   projectMembers,
   agents,
+  tasks,
   runs,
   runEvents,
   runCheckpoints,
@@ -44,6 +46,7 @@ describe('schema table names', () => {
     projectAgents: 'project_agents',
     projectMembers: 'project_members',
     agents: 'agents',
+    tasks: 'tasks',
     runs: 'runs',
     runEvents: 'run_events',
     runCheckpoints: 'run_checkpoints',
@@ -59,9 +62,9 @@ describe('schema table names', () => {
   }
 });
 
-describe('schema exports all 14 tables', () => {
-  it('has exactly 14 tables', () => {
-    expect(Object.keys(ALL_TABLES)).toHaveLength(14);
+describe('schema test tracks 15 core tables', () => {
+  it('has exactly 15 tracked tables', () => {
+    expect(Object.keys(ALL_TABLES)).toHaveLength(15);
   });
 });
 
@@ -77,10 +80,21 @@ describe('key columns exist', () => {
   it('runs has agent_id, status, prompt, provider, connection_mode', () => {
     const cols = Object.keys(getTableColumns(runs));
     expect(cols).toContain('agentId');
+    expect(cols).toContain('taskId');
+    expect(cols).toContain('conversationId');
     expect(cols).toContain('status');
     expect(cols).toContain('prompt');
     expect(cols).toContain('provider');
     expect(cols).toContain('connectionMode');
+  });
+
+  it('tasks has project_id, agent_id, created_by, head_run_id, active_run_id', () => {
+    const cols = Object.keys(getTableColumns(tasks));
+    expect(cols).toContain('projectId');
+    expect(cols).toContain('agentId');
+    expect(cols).toContain('createdBy');
+    expect(cols).toContain('headRunId');
+    expect(cols).toContain('activeRunId');
   });
 
   it('project_agents has project_id, agent_id, is_current, config_override', () => {

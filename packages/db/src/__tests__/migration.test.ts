@@ -65,6 +65,7 @@ describe('migration replay on clean database', () => {
 
     expect(tables).toContain('users');
     expect(tables).toContain('projects');
+    expect(tables).toContain('tasks');
     expect(tables).toContain('runs');
     expect(tables).toContain('agents');
     expect(tables).toContain('run_events');

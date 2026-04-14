@@ -1,4 +1,4 @@
-import { agents, projectMembers, projects, runEvents, runs, users } from '../src/schema/index.js';
+import { agents, projectMembers, projects, runEvents, runs, tasks, users } from '../src/schema/index.js';
 import type { TestDb } from './pglite-helpers.js';
 
 export async function createTestUser(db: TestDb, overrides?: { name?: string; email?: string }) {
@@ -49,12 +49,36 @@ export async function createTestAgent(db: TestDb, projectId: string, createdBy?:
   return agent;
 }
 
-export async function createTestRun(db: TestDb, agentId: string, overrides?: { prompt?: string }) {
+export async function createTestTask(
+  db: TestDb,
+  projectId: string,
+  createdBy: string,
+  overrides?: { agentId?: string; title?: string }
+) {
+  const [task] = await db
+    .insert(tasks)
+    .values({
+      projectId,
+      createdBy,
+      agentId: overrides?.agentId ?? null,
+      title: overrides?.title ?? 'Test Task',
+    })
+    .returning();
+  return task;
+}
+
+export async function createTestRun(
+  db: TestDb,
+  agentId: string,
+  overrides?: { prompt?: string; taskId?: string | null; conversationId?: string | null }
+) {
   const [run] = await db
     .insert(runs)
     .values({
       agentId,
       prompt: overrides?.prompt ?? 'Test prompt',
+      taskId: overrides?.taskId ?? null,
+      conversationId: overrides?.conversationId ?? null,
     })
     .returning();
   return run;

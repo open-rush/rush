@@ -10,6 +10,8 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { agents } from './agents.js';
+import { conversations } from './conversations.js';
+import { tasks } from './tasks.js';
 
 export const runs = pgTable(
   'runs',
@@ -18,6 +20,10 @@ export const runs = pgTable(
     agentId: uuid('agent_id')
       .notNull()
       .references(() => agents.id, { onDelete: 'cascade' }),
+    taskId: uuid('task_id').references(() => tasks.id, { onDelete: 'set null' }),
+    conversationId: uuid('conversation_id').references(() => conversations.id, {
+      onDelete: 'set null',
+    }),
     parentRunId: uuid('parent_run_id').references((): AnyPgColumn => runs.id, {
       onDelete: 'set null',
     }),
@@ -39,6 +45,8 @@ export const runs = pgTable(
   },
   (t) => [
     index('runs_agent_id_status_idx').on(t.agentId, t.status),
+    index('runs_task_id_idx').on(t.taskId),
+    index('runs_conversation_id_idx').on(t.conversationId),
     index('runs_parent_run_id_idx').on(t.parentRunId),
   ]
 );

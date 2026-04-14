@@ -5,6 +5,8 @@ export const Run = z
   .object({
     id: z.string().uuid(),
     agentId: z.string().uuid(),
+    taskId: z.string().uuid().nullable().default(null),
+    conversationId: z.string().uuid().nullable().default(null),
     parentRunId: z.string().uuid().nullable().default(null),
     status: RunStatus.default('queued'),
     prompt: z.string().min(1),
@@ -30,6 +32,8 @@ export type Run = z.infer<typeof Run>;
 export const RunSpec = z.object({
   prompt: z.string().min(1),
   projectId: z.string().uuid(),
+  taskId: z.string().uuid().optional(),
+  conversationId: z.string().uuid().optional(),
   agentId: z.string().uuid().optional(),
   connectionMode: ConnectionMode.optional(),
   model: z.string().optional(),
