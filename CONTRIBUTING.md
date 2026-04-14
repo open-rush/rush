@@ -14,7 +14,7 @@ Thanks for your interest in contributing to Lux! This guide covers everything yo
 
 ```bash
 # Clone the repo
-git clone https://github.com/open-rush/lux.git
+git clone https://github.com/rush-open/lux.git
 cd rush
 
 # Install dependencies
@@ -122,4 +122,4 @@ For significant design decisions, we maintain specs in `specs/`. If your change 
 
 ## Questions?
 
-Open a [discussion](https://github.com/open-rush/lux/discussions) or an issue.
+Open a [discussion](https://github.com/rush-open/lux/discussions) or an issue.

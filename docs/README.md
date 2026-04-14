@@ -3,7 +3,7 @@
 ## Quick Start
 
 ```bash
-git clone https://github.com/open-rush/lux.git
+git clone https://github.com/rush-open/lux.git
 cd rush
 pnpm install
 docker compose -f docker/docker-compose.dev.yml up -d
