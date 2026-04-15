@@ -23,10 +23,21 @@
     "db:push": "DATABASE_URL=postgresql://rush:rush@localhost:5432/rush pnpm --filter @open-rush/db db:push",
     "db:generate": "pnpm --filter @open-rush/db db:generate",
     "db:studio": "DATABASE_URL=postgresql://rush:rush@localhost:5432/rush pnpm --filter @open-rush/db db:studio",
-    "test:integration": "turbo test:integration"
+    "test:integration": "turbo test:integration",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "biome check --fix --no-errors-on-unmatched"
+    ],
+    "*.{json,css,md}": [
+      "biome format --write --no-errors-on-unmatched"
+    ]
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.11",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "turbo": "^2.5.0",
     "typescript": "^5.8.0"
   }
