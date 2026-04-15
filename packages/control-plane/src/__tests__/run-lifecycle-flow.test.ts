@@ -31,6 +31,8 @@ class InMemoryRunDb implements RunDb {
     const run: Run = {
       id: `run-${this.nextId++}`,
       agentId: input.agentId,
+      taskId: input.taskId ?? null,
+      conversationId: input.conversationId ?? null,
       parentRunId: input.parentRunId ?? null,
       status: 'queued',
       prompt: input.prompt,
@@ -437,6 +439,8 @@ describe('Run Lifecycle Flow', () => {
       return {
         id,
         agentId: 'agent-1',
+        taskId: null,
+        conversationId: null,
         parentRunId: null,
         status,
         prompt: 'test',
