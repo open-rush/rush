@@ -275,7 +275,7 @@ pnpm dev                # http://localhost:3000
 | GitHub                                                                                   | 方向                                                                               |
 | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | [@pandoralink](https://github.com/pandoralink)                                           | Web 交互体验、AI 对话链路、可观测平台前端                                          |
-| [@fwxhn](https://github.com/fwxhn)                                                       | CLI 工具链、[reskill](https://github.com/nicepkg/reskill) 包管理器、可观测平台前端 |
+| [@yanglx-lara](https://github.com/yanglx-lara)                                           | CLI 工具链、[reskill](https://github.com/nicepkg/reskill) 包管理器、可观测平台前端 |
 | [@yongchaoo](https://github.com/yongchaoo) · [luocy010@163.com](mailto:luocy010@163.com) | MCP 运行时、Agent 交付模式、前端可观测性                                           |
 
 以上贡献者目前正在看新的机会，欢迎联系。
