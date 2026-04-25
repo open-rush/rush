@@ -1,4 +1,5 @@
 export { accounts } from './accounts.js';
+export { agentDefinitionVersions } from './agent-definition-versions.js';
 export { agents } from './agents.js';
 export { artifacts } from './artifacts.js';
 export { conversations } from './conversations.js';

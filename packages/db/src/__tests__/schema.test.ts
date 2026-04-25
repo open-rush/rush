@@ -2,6 +2,7 @@ import { getTableColumns, getTableName } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import {
   accounts,
+  agentDefinitionVersions,
   agents,
   artifacts,
   projectAgents,
@@ -27,6 +28,7 @@ const ALL_TABLES = {
   projectAgents,
   projectMembers,
   agents,
+  agentDefinitionVersions,
   tasks,
   runs,
   runEvents,
@@ -46,6 +48,7 @@ describe('schema table names', () => {
     projectAgents: 'project_agents',
     projectMembers: 'project_members',
     agents: 'agents',
+    agentDefinitionVersions: 'agent_definition_versions',
     tasks: 'tasks',
     runs: 'runs',
     runEvents: 'run_events',
@@ -62,9 +65,27 @@ describe('schema table names', () => {
   }
 });
 
-describe('schema test tracks 15 core tables', () => {
-  it('has exactly 15 tracked tables', () => {
-    expect(Object.keys(ALL_TABLES)).toHaveLength(15);
+describe('schema test tracks 16 core tables', () => {
+  it('has exactly 16 tracked tables', () => {
+    expect(Object.keys(ALL_TABLES)).toHaveLength(16);
+  });
+});
+
+describe('agents AgentDefinition versioning columns', () => {
+  it('agents table exposes current_version and archived_at columns', () => {
+    const cols = Object.keys(getTableColumns(agents));
+    expect(cols).toContain('currentVersion');
+    expect(cols).toContain('archivedAt');
+  });
+
+  it('agent_definition_versions has agent_id, version, snapshot, change_note, created_by', () => {
+    const cols = Object.keys(getTableColumns(agentDefinitionVersions));
+    expect(cols).toContain('agentId');
+    expect(cols).toContain('version');
+    expect(cols).toContain('snapshot');
+    expect(cols).toContain('changeNote');
+    expect(cols).toContain('createdBy');
+    expect(cols).toContain('createdAt');
   });
 });
 

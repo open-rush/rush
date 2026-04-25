@@ -24,7 +24,7 @@ Source of truth 见 `.claude/plans/managed-agents-p0-p1.md`。本文件仅用于
 
 ## M1: Foundation
 
-- [ ] `task-1-schema-agent-definition-versions` — **Agent-0**
+- [x] `task-1-schema-agent-definition-versions` — **Agent-0**
       域: `packages/db/src/schema/agent-definition-versions.ts`, `packages/db/drizzle/*.sql`, `packages/db/src/schema/agents.ts` (加 current_version + archived_at)
       依赖: 无
       验收:

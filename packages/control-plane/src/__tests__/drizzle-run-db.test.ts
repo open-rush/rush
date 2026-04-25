@@ -72,6 +72,8 @@ beforeAll(async () => {
       config JSONB,
       created_by UUID REFERENCES users(id) ON DELETE SET NULL,
       active_stream_id TEXT,
+      current_version INTEGER NOT NULL DEFAULT 1,
+      archived_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       last_active_at TIMESTAMPTZ NOT NULL DEFAULT now()

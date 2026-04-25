@@ -64,6 +64,20 @@
       "when": 1776153549897,
       "tag": "0008_sharp_dust",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777124568935,
+      "tag": "0009_agent_definition_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777125758368,
+      "tag": "0010_chemical_namorita",
+      "breakpoints": true
     }
   ]
 }

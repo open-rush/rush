@@ -16,6 +16,7 @@ const TABLE_NAMES = [
   'tasks',
   'sandboxes',
   'project_agents',
+  'agent_definition_versions',
   'agents',
   'project_members',
   'projects',
@@ -141,10 +142,30 @@ async function applySchema(db: TestDb): Promise<void> {
       config JSONB,
       created_by UUID REFERENCES users(id) ON DELETE SET NULL,
       active_stream_id TEXT,
+      current_version INTEGER NOT NULL DEFAULT 1,
+      archived_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       last_active_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
+  `);
+
+  // Agent definition versions
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS agent_definition_versions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      version INTEGER NOT NULL,
+      snapshot JSONB NOT NULL,
+      change_note TEXT,
+      created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT agent_definition_versions_agent_version_uniq UNIQUE(agent_id, version)
+    )
+  `);
+  await db.execute(sql`
+    CREATE INDEX IF NOT EXISTS agent_definition_versions_agent_idx
+    ON agent_definition_versions (agent_id, version DESC)
   `);
 
   // Project agents

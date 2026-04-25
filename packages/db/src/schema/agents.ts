@@ -38,6 +38,17 @@ export const agents = pgTable(
     config: jsonb('config'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     activeStreamId: text('active_stream_id'),
+    /**
+     * Points at the latest version number in `agent_definition_versions`.
+     * Monotonically increases (starting at 1) with each PATCH.
+     * See specs/agent-definition-versioning.md §数据模型.
+     */
+    currentVersion: integer('current_version').notNull().default(1),
+    /**
+     * When set, the agent definition is archived and cannot be PATCHed.
+     * Existing runs/agents (tasks) continue to work with their frozen version.
+     */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }).defaultNow().notNull(),
