@@ -358,4 +358,185 @@ describe('DrizzleRunDb', () => {
       expect(stuck[0].status).toBe('worker_unreachable');
     });
   });
+
+  // -------------------------------------------------------------------
+  // Task-11: idempotency lookup + transactional lookup-or-insert
+  // -------------------------------------------------------------------
+  describe('findLatestByIdempotencyKey', () => {
+    it('returns null when no run has the key', async () => {
+      const rdb = getRunDb();
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      expect(await rdb.findLatestByIdempotencyKey('missing', since)).toBeNull();
+    });
+
+    it('returns the run matching a key inside the window', async () => {
+      const rdb = getRunDb();
+      const run = await rdb.create({
+        agentId: testAgentId,
+        prompt: 'p',
+        idempotencyKey: 'k1',
+        idempotencyRequestHash: 'h1',
+      });
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const found = await rdb.findLatestByIdempotencyKey('k1', since);
+      expect(found?.id).toBe(run.id);
+      expect(found?.idempotencyKey).toBe('k1');
+      expect(found?.idempotencyRequestHash).toBe('h1');
+    });
+
+    it('excludes runs created before the window cutoff', async () => {
+      const rdb = getRunDb();
+      const run = await rdb.create({
+        agentId: testAgentId,
+        prompt: 'p',
+        idempotencyKey: 'k2',
+        idempotencyRequestHash: 'h2',
+      });
+      // Push the row 48h back.
+      const old = new Date(Date.now() - 48 * 60 * 60 * 1000);
+      await db.update(runs).set({ createdAt: old }).where(eq(runs.id, run.id));
+
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      expect(await rdb.findLatestByIdempotencyKey('k2', since)).toBeNull();
+    });
+
+    it('returns the most recent row when multiple in-window matches exist', async () => {
+      const rdb = getRunDb();
+      const first = await rdb.create({
+        agentId: testAgentId,
+        prompt: 'p1',
+        idempotencyKey: 'k-multi',
+        idempotencyRequestHash: 'h',
+      });
+      // Small delay to force later createdAt
+      await new Promise((r) => setTimeout(r, 5));
+      const second = await rdb.create({
+        agentId: testAgentId,
+        prompt: 'p2',
+        idempotencyKey: 'k-multi',
+        idempotencyRequestHash: 'h',
+      });
+      const since = new Date(Date.now() - 60 * 1000);
+      const found = await rdb.findLatestByIdempotencyKey('k-multi', since);
+      expect(found?.id).toBe(second.id);
+      expect(found?.id).not.toBe(first.id);
+    });
+  });
+
+  describe('createWithIdempotencyTx', () => {
+    it('inserts a fresh row when no existing match', async () => {
+      const rdb = getRunDb();
+      const since = new Date(Date.now() - 60 * 60 * 1000);
+      const run = await rdb.createWithIdempotencyTx(
+        {
+          agentId: testAgentId,
+          prompt: 'fresh',
+          idempotencyKey: 'k-fresh',
+          idempotencyRequestHash: 'h-fresh',
+        },
+        { key: 'k-fresh', since },
+        () => {
+          throw new Error('onExisting should not be called for fresh insert');
+        }
+      );
+      expect(run.idempotencyKey).toBe('k-fresh');
+      expect(run.idempotencyRequestHash).toBe('h-fresh');
+      expect(run.prompt).toBe('fresh');
+    });
+
+    it('calls onExisting with the in-window match and returns its verdict', async () => {
+      const rdb = getRunDb();
+      const seed = await rdb.create({
+        agentId: testAgentId,
+        prompt: 'seed',
+        idempotencyKey: 'k-replay',
+        idempotencyRequestHash: 'h-r',
+      });
+      const since = new Date(Date.now() - 60 * 60 * 1000);
+      const result = await rdb.createWithIdempotencyTx(
+        {
+          agentId: testAgentId,
+          prompt: 'seed',
+          idempotencyKey: 'k-replay',
+          idempotencyRequestHash: 'h-r',
+        },
+        { key: 'k-replay', since },
+        (existing) => {
+          expect(existing.id).toBe(seed.id);
+          expect(existing.idempotencyRequestHash).toBe('h-r');
+          return existing;
+        }
+      );
+      expect(result.id).toBe(seed.id);
+      // No second insert should have happened.
+      const rows = await db.select().from(runs).where(eq(runs.idempotencyKey, 'k-replay'));
+      expect(rows).toHaveLength(1);
+    });
+
+    it('propagates throws from onExisting (conflict path)', async () => {
+      const rdb = getRunDb();
+      await rdb.create({
+        agentId: testAgentId,
+        prompt: 'p',
+        idempotencyKey: 'k-conflict',
+        idempotencyRequestHash: 'h-orig',
+      });
+      const since = new Date(Date.now() - 60 * 60 * 1000);
+      await expect(
+        rdb.createWithIdempotencyTx(
+          {
+            agentId: testAgentId,
+            prompt: 'p',
+            idempotencyKey: 'k-conflict',
+            idempotencyRequestHash: 'h-new',
+          },
+          { key: 'k-conflict', since },
+          (_existing) => {
+            throw new Error('conflict');
+          }
+        )
+      ).rejects.toThrow('conflict');
+
+      // The conflict path must not insert a second row.
+      const rows = await db.select().from(runs).where(eq(runs.idempotencyKey, 'k-conflict'));
+      expect(rows).toHaveLength(1);
+    });
+
+    // LIMITATION: PGlite is single-connection, so Promise.all does not
+    // exercise true multi-connection contention. This test validates the
+    // control-flow contract (only one INSERT, second caller sees the
+    // first row in onExisting) — NOT the concurrency property of the
+    // advisory lock itself. Proof of cross-connection serialization
+    // lives in the Docker-backed integration suite (task-18 E2E).
+    it('serializes concurrent same-key writes via advisory lock (control-flow contract)', async () => {
+      const rdb = getRunDb();
+      const since = new Date(Date.now() - 60 * 60 * 1000);
+      const payload = {
+        agentId: testAgentId,
+        prompt: 'p',
+        idempotencyKey: 'k-concurrent',
+        idempotencyRequestHash: 'h-c',
+      };
+
+      let seenExisting = 0;
+      const run = (): Promise<Run> =>
+        rdb.createWithIdempotencyTx(payload, { key: 'k-concurrent', since }, (existing) => {
+          seenExisting += 1;
+          return existing;
+        });
+
+      const [a, b] = await Promise.all([run(), run()]);
+      expect(a.idempotencyKey).toBe('k-concurrent');
+      expect(b.idempotencyKey).toBe('k-concurrent');
+      // Winner: seenExisting=0; loser: 1.
+      expect(seenExisting).toBe(1);
+      expect(a.id).toBe(b.id);
+
+      const rows = await db.select().from(runs).where(eq(runs.idempotencyKey, 'k-concurrent'));
+      expect(rows).toHaveLength(1);
+    });
+  });
 });
+
+/** Narrow import so the signature block above compiles without `Run` typed imports. */
+import type { Run } from '../run/run-service.js';

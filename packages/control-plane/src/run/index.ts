@@ -13,8 +13,24 @@ export {
 } from './checkpoint-service.js';
 export { DrizzleCheckpointDb } from './drizzle-checkpoint-db.js';
 export { DrizzleRunDb } from './drizzle-run-db.js';
+export {
+  canonicalJsonStringify,
+  computeIdempotencyHash,
+  IDEMPOTENCY_WINDOW_MS,
+  IdempotencyConflictError,
+  LOCK_NS_IDEMPOTENCY,
+  scopeIdempotencyKey,
+} from './idempotency.js';
 export { RunOrchestrator, type RunOrchestratorDeps } from './run-orchestrator.js';
-export { type CreateRunInput, type Run, type RunDb, RunService } from './run-service.js';
+export {
+  type CreateRunInput,
+  type Run,
+  RunAlreadyTerminalError,
+  RunCannotCancelError,
+  type RunDb,
+  RunNotFoundError,
+  RunService,
+} from './run-service.js';
 export {
   canTransition,
   getValidTransitions,
