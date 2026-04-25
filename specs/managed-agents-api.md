@@ -146,23 +146,48 @@ Content-Type: text/event-stream
 Cache-Control: no-cache
 
 id: 42
-data: {"type":"text-delta","textDelta":"好的"}
+data: {"type":"text-delta","id":"msg_1","delta":"好的"}
 
 id: 43
-data: {"type":"tool-Read","toolCallId":"call_1","state":"call","input":{...}}
+data: {"type":"tool-input-available","toolCallId":"call_1","toolName":"Read","input":{...}}
 
 id: 44
+data: {"type":"tool-output-available","toolCallId":"call_1","output":{...}}
+
+id: 45
 data: {"type":"data-openrush-run-done","data":{"status":"success"}}
 ```
 
 ### 事件 payload 类型
 
-**AI SDK 标准 part**(直接使用 `@ai-sdk/ui-utils` UIMessagePart):
-- `text-delta` — 文本增量
-- `reasoning` — 推理
-- `step-start` / `step-finish` — 步骤边界
-- `tool-<Name>` — 工具调用(state: "call" | "result" | "error")
-- `data-<key>` — 自定义数据载荷
+**权威来源**: `packages/contracts/src/enums.ts` 的 `UIMessageChunkType` 枚举与 `packages/contracts/src/v1/runs.ts` 的 `runEventPayloadSchema` 判别联合。本文列出的类型清单以该两处为准;如有文字与 contracts 不一致,以 contracts 为准。
+
+**AI SDK 6 UIMessageChunk**(直接引用仓库 runtime 实际消费的 chunk 格式,不 import `ai` 包至 contracts 以避免 React 等重依赖,见 v1/runs.ts 注释):
+
+文本流(三段式):
+- `text-start` — `{ id? }`
+- `text-delta` — `{ id?, delta?, content? }`
+- `text-end` — `{ id? }`
+
+推理流(三段式):
+- `reasoning-start` / `reasoning-delta` / `reasoning-end`(字段与 text-* 同构)
+
+工具调用生命周期(工具名走 `toolName`,不编码在 `type` 字符串里):
+- `tool-input-start` — `{ toolCallId?, toolName? }`
+- `tool-input-delta` — `{ toolCallId?, delta? }`
+- `tool-input-available` — `{ toolCallId?, toolName?, input? }`
+- `tool-output-available` — `{ toolCallId?, output? }`
+- `tool-output-error` — `{ toolCallId?, errorText? }`
+
+流 / 步骤生命周期:
+- `start` — `{ messageId? }`
+- `finish` — `{ reason? }`
+- `error` — `{ errorText? }`
+- `start-step` — 无额外字段
+- `finish-step` — `{ reason? }`
+
+通用自定义数据(非保留前缀):
+- `data-<key>` — `{ type: 'data-<key>', id?, data }`,`<key>` 匹配 `[A-Za-z0-9_-]+`;`data-openrush-*` 子集保留给下方扩展。
 
 **Open-rush 扩展**(统一走 `data-openrush-*` 前缀,前端可选消费):
 - `data-openrush-run-started` — `{ runId, agentId, definitionVersion }`
@@ -170,7 +195,7 @@ data: {"type":"data-openrush-run-done","data":{"status":"success"}}
 - `data-openrush-usage` — `{ tokensIn, tokensOut, costUsd }`
 - `data-openrush-sub-run` — `{ parentRunId, childRunId }`
 
-**存储**: `run_events.payload` 直接存 UIMessagePart 原格式,`run_events.event_type` 存 `type` 字段便于查询。
+**存储**: `run_events.payload` 直接存 UIMessageChunk 原格式,`run_events.event_type` 存 `type` 字段便于查询。
 
 ### 事件写入单写者模型
 
