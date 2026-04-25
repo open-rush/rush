@@ -12,6 +12,8 @@ export {
   type CreateAgentDefinitionInput,
   EmptyAgentDefinitionPatchError,
   InvalidAgentDefinitionInputError,
+  type ListAgentDefinitionsOptions,
+  type ListAgentDefinitionsResult,
   type ListVersionsOptions,
   type ListVersionsResult,
   type PatchAgentDefinitionInput,

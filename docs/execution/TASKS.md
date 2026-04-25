@@ -100,7 +100,7 @@ Source of truth 见 `.claude/plans/managed-agents-p0-p1.md`。本文件仅用于
       - 单测覆盖版本冲突 / 归档后 patch 被拒
       - verify: `./docs/execution/verify.sh task-7`
 
-- [ ] `task-8-api-v1-agent-definitions` — **Agent-A**
+- [x] `task-8-api-v1-agent-definitions` — **Agent-A**
       域: `apps/web/app/api/v1/agent-definitions/*`
       依赖: task-5, task-7
       验收:

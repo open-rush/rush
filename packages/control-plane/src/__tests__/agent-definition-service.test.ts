@@ -598,3 +598,110 @@ describe('AgentDefinitionService invariants', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// list()
+// ---------------------------------------------------------------------------
+
+describe('AgentDefinitionService.list', () => {
+  it('returns definitions in created_at DESC (newest first)', async () => {
+    const a = await service.create(makeCreateInput({ name: 'A' }));
+    // Force a later timestamp so the DESC sort is deterministic.
+    await db.execute(
+      sql`UPDATE agents SET created_at = now() + interval '1 second' WHERE id = ${a.id}`
+    );
+    const b = await service.create(makeCreateInput({ name: 'B' }));
+    await db.execute(
+      sql`UPDATE agents SET created_at = now() + interval '2 second' WHERE id = ${b.id}`
+    );
+    const res = await service.list({});
+    expect(res.items.map((d) => d.name)).toEqual(['B', 'A']);
+    expect(res.nextCursor).toBeNull();
+  });
+
+  it('filters by projectId', async () => {
+    await service.create(makeCreateInput({ name: 'A' }));
+    const [u] = await db
+      .insert(users)
+      .values({ name: 'Bob', email: `bob-${Math.random()}@ex.com` })
+      .returning();
+    const [otherProject] = await db
+      .insert(projects)
+      .values({ name: 'OP', createdBy: u.id })
+      .returning();
+    const other = await service.create(makeCreateInput({ name: 'B', projectId: otherProject.id }));
+
+    const onlyMine = await service.list({ projectId });
+    expect(onlyMine.items.map((d) => d.name)).toEqual(['A']);
+    const onlyOther = await service.list({ projectId: otherProject.id });
+    expect(onlyOther.items.map((d) => d.id)).toEqual([other.id]);
+  });
+
+  it('filters by projectIds (IN clause)', async () => {
+    const [u] = await db
+      .insert(users)
+      .values({ name: 'Carol', email: `carol-${Math.random()}@ex.com` })
+      .returning();
+    const [p2] = await db.insert(projects).values({ name: 'P2', createdBy: u.id }).returning();
+    await service.create(makeCreateInput({ name: 'X' }));
+    await service.create(makeCreateInput({ name: 'Y', projectId: p2.id }));
+    const res = await service.list({ projectIds: [projectId, p2.id] });
+    expect(res.items.map((d) => d.name).sort()).toEqual(['X', 'Y']);
+  });
+
+  it('projectIds=[] short-circuits to no rows (without hitting DB)', async () => {
+    await service.create(makeCreateInput());
+    const res = await service.list({ projectIds: [] });
+    expect(res.items).toHaveLength(0);
+    expect(res.nextCursor).toBeNull();
+  });
+
+  it('excludes archived rows by default; includeArchived=true includes them', async () => {
+    const a = await service.create(makeCreateInput({ name: 'A' }));
+    const b = await service.create(makeCreateInput({ name: 'B' }));
+    await service.archive(b.id);
+
+    const defaultList = await service.list({});
+    expect(defaultList.items.map((d) => d.id)).toEqual([a.id]);
+
+    const withArchived = await service.list({ includeArchived: true });
+    expect(withArchived.items.map((d) => d.id).sort()).toEqual([a.id, b.id].sort());
+  });
+
+  it('paginates with opaque cursor (round-trip verbatim)', async () => {
+    for (let i = 0; i < 5; i++) {
+      const d = await service.create(makeCreateInput({ name: `A${i}` }));
+      await db.execute(
+        sql`UPDATE agents SET created_at = now() + interval '${sql.raw(String(i))} seconds' WHERE id = ${d.id}`
+      );
+    }
+    const first = await service.list({ limit: 2 });
+    expect(first.items).toHaveLength(2);
+    expect(first.nextCursor).not.toBeNull();
+
+    const second = await service.list({ limit: 2, cursor: first.nextCursor ?? undefined });
+    expect(second.items).toHaveLength(2);
+    const firstIds = new Set(first.items.map((d) => d.id));
+    for (const it of second.items) expect(firstIds.has(it.id)).toBe(false);
+
+    const third = await service.list({ limit: 2, cursor: second.nextCursor ?? undefined });
+    expect(third.items).toHaveLength(1);
+    expect(third.nextCursor).toBeNull();
+  });
+
+  it('ignores malformed cursors (returns first page instead of erroring)', async () => {
+    await service.create(makeCreateInput());
+    for (const bad of ['not-base64', '!!!not valid!!!', '', ' ']) {
+      const res = await service.list({ cursor: bad });
+      expect(res.items).toHaveLength(1);
+    }
+  });
+
+  it('clamps limit to 1..200', async () => {
+    await service.create(makeCreateInput());
+    const res = await service.list({ limit: 9999 });
+    expect(res.items.length).toBeLessThanOrEqual(200);
+    const res2 = await service.list({ limit: 0 });
+    expect(res2.items).toHaveLength(1);
+  });
+});

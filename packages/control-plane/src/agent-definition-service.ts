@@ -20,7 +20,7 @@
  *   the pglite driver with the shared pglite-helpers schema.
  */
 import { agentDefinitionVersions, agents, type DbClient } from '@open-rush/db';
-import { and, desc, eq, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 
 type AgentRow = typeof agents.$inferSelect;
 type AgentVersionRow = typeof agentDefinitionVersions.$inferSelect;
@@ -101,6 +101,37 @@ export interface ListVersionsResult {
    * if no more rows. Smaller than the smallest `version` in `items`.
    */
   nextCursor: number | null;
+}
+
+/** Options for GET /api/v1/agent-definitions (top-level list). */
+export interface ListAgentDefinitionsOptions {
+  /** Filter to a single project. Takes precedence over `projectIds`. */
+  projectId?: string;
+  /**
+   * Filter to a set of projects (`project_id IN (...)`). Useful when the
+   * caller is scoped to "any project I can access" rather than a single
+   * project. An empty array returns no rows.
+   */
+  projectIds?: string[];
+  /** Include archived rows (default false). */
+  includeArchived?: boolean;
+  /** Max rows (1..200), default 50. */
+  limit?: number;
+  /**
+   * Opaque cursor produced by a previous page's `nextCursor`. Internally
+   * encodes the last row's `(created_at, id)` so pagination is deterministic
+   * even across rows with identical `created_at`.
+   */
+  cursor?: string;
+}
+
+export interface ListAgentDefinitionsResult {
+  items: AgentDefinition[];
+  /**
+   * Opaque cursor for the next page, or `null` if no more rows. Round-trip it
+   * verbatim to the next {@link ListAgentDefinitionsOptions.cursor}.
+   */
+  nextCursor: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -415,6 +446,79 @@ export class AgentDefinitionService {
   }
 
   /**
+   * GET /api/v1/agent-definitions — cursor-paginated list, newest first.
+   *
+   * Ordering: `(created_at DESC, id DESC)` — the `id` tiebreaker lets the
+   * cursor be deterministic across rows that share a `created_at` (e.g. from
+   * bulk fixture imports). The cursor is an opaque base64url string that the
+   * client must round-trip verbatim.
+   *
+   * Filters:
+   * - `projectId`: restrict to a single project.
+   * - `includeArchived`: default `false` → excludes rows with `archived_at IS NOT NULL`.
+   *
+   * NOTE: this method does NOT enforce project membership. The route layer is
+   * responsible for scoping callers to projects they can see (by passing
+   * `projectId` only after checking access, or by post-filtering).
+   */
+  async list(opts: ListAgentDefinitionsOptions = {}): Promise<ListAgentDefinitionsResult> {
+    // Empty projectIds = caller can't see anything → short-circuit to no rows.
+    if (opts.projectIds !== undefined && opts.projectIds.length === 0) {
+      return { items: [], nextCursor: null };
+    }
+
+    const limit = clampLimit(opts.limit);
+    const includeArchived = opts.includeArchived === true;
+    const cursor = decodeListCursor(opts.cursor);
+
+    const filters = [];
+    if (opts.projectId) {
+      filters.push(eq(agents.projectId, opts.projectId));
+    } else if (opts.projectIds) {
+      filters.push(inArray(agents.projectId, opts.projectIds));
+    }
+    if (!includeArchived) filters.push(isNull(agents.archivedAt));
+    // Pagination: keyset over (date_trunc('ms', created_at), id).
+    //
+    // PostgreSQL `timestamptz` stores microseconds but `Date.toISOString()`
+    // renders only milliseconds. If we compared raw `created_at` to a
+    // ms-precision cursor, microsecond-different rows in the same ms bucket
+    // could be lost (cursor `< .123Z` excludes a row at `.123456`, and `=`
+    // never matches because microseconds differ).
+    //
+    // We reconcile by truncating BOTH sides to millisecond precision with
+    // `date_trunc('milliseconds', created_at)`. That matches the cursor
+    // exactly and preserves the `id`-tiebreaker semantics.
+    if (cursor) {
+      filters.push(
+        or(
+          sql`date_trunc('milliseconds', ${agents.createdAt}) < ${cursor.createdAt}`,
+          and(
+            sql`date_trunc('milliseconds', ${agents.createdAt}) = ${cursor.createdAt}`,
+            lt(agents.id, cursor.id)
+          )
+        ) as never
+      );
+    }
+
+    const where = filters.length === 0 ? undefined : and(...filters);
+    const rows = await this.db
+      .select()
+      .from(agents)
+      .where(where as never)
+      // Order BY date_trunc match filter precision; id tiebreaker stays strict.
+      .orderBy(sql`date_trunc('milliseconds', ${agents.createdAt}) DESC`, desc(agents.id))
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
+    const items = page.map(rowToDefinition);
+    const last = page[page.length - 1];
+    const nextCursor = hasMore && last ? encodeListCursor(last.createdAt, last.id) : null;
+    return { items, nextCursor };
+  }
+
+  /**
    * GET /api/v1/agent-definitions/:id?version=N — returns the historical
    * snapshot merged with the owning agent row's immutable metadata.
    */
@@ -589,4 +693,34 @@ export class AgentDefinitionService {
 function clampLimit(raw: number | undefined): number {
   if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 1) return 50;
   return Math.min(Math.floor(raw), 200);
+}
+
+/**
+ * List cursor = base64url("<createdAtISO>|<id>"). Opaque to clients; decoded
+ * back into `(createdAt: Date, id: string)` for keyset pagination.
+ *
+ * Malformed / unparseable cursors are silently dropped (return `null` from
+ * {@link decodeListCursor}); the caller falls back to "no cursor = first page"
+ * semantics, which is friendlier than erroring on a cosmetic issue.
+ */
+function encodeListCursor(createdAt: Date, id: string): string {
+  const raw = `${createdAt.toISOString()}|${id}`;
+  return Buffer.from(raw, 'utf8').toString('base64url');
+}
+
+function decodeListCursor(cursor: string | undefined): { createdAt: Date; id: string } | null {
+  if (!cursor) return null;
+  try {
+    const raw = Buffer.from(cursor, 'base64url').toString('utf8');
+    const sep = raw.indexOf('|');
+    if (sep < 0) return null;
+    const iso = raw.slice(0, sep);
+    const id = raw.slice(sep + 1);
+    if (!iso || !id) return null;
+    const createdAt = new Date(iso);
+    if (Number.isNaN(createdAt.getTime())) return null;
+    return { createdAt, id };
+  } catch {
+    return null;
+  }
 }
