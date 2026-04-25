@@ -175,4 +175,122 @@ describe('DrizzleEventStore', () => {
     const rows = await db.select().from(runEvents).where(eq(runEvents.runId, runId));
     expect(rows).toHaveLength(1);
   });
+
+  // ---------------------------------------------------------------------
+  // appendAssignSeq (task-10): server-side seq allocation (single-writer)
+  // ---------------------------------------------------------------------
+  describe('appendAssignSeq', () => {
+    it('assigns seq=1 for the first event of a run', async () => {
+      const store = new DrizzleEventStore(db as never);
+      const result = await store.appendAssignSeq({
+        runId,
+        eventType: 'start',
+        payload: { type: 'start' },
+      });
+      expect(result.inserted).toBe(true);
+      expect(result.event.seq).toBe(1);
+      expect(result.event.runId).toBe(runId);
+    });
+
+    it('increments seq monotonically on successive calls', async () => {
+      const store = new DrizzleEventStore(db as never);
+      const a = await store.appendAssignSeq({
+        runId,
+        eventType: 'text-start',
+        payload: { type: 'text-start' },
+      });
+      const b = await store.appendAssignSeq({
+        runId,
+        eventType: 'text-delta',
+        payload: { type: 'text-delta', delta: 'hi' },
+      });
+      const c = await store.appendAssignSeq({
+        runId,
+        eventType: 'text-end',
+        payload: { type: 'text-end' },
+      });
+      expect([a.event.seq, b.event.seq, c.event.seq]).toEqual([1, 2, 3]);
+
+      // Persisted rows match
+      const persisted = await store.getEvents(runId);
+      expect(persisted.map((e) => e.seq)).toEqual([1, 2, 3]);
+    });
+
+    it('coexists with legacy append (already-written rows at lower seq)', async () => {
+      const store = new DrizzleEventStore(db as never);
+      // Legacy caller pre-wrote seq=0 (pre-v1 counter starts at 0)
+      await store.append({ runId, eventType: 'legacy', payload: null, seq: 0 });
+      const next = await store.appendAssignSeq({
+        runId,
+        eventType: 'assigned',
+        payload: null,
+      });
+      // MAX(seq)+1 = 1 — the assigned event lands on 1
+      expect(next.event.seq).toBe(1);
+    });
+
+    it('serializes concurrent writers on the same run without gaps or duplicates', async () => {
+      const store = new DrizzleEventStore(db as never);
+      const N = 25;
+      const results = await Promise.all(
+        Array.from({ length: N }, (_, i) =>
+          store.appendAssignSeq({
+            runId,
+            eventType: 'text-delta',
+            payload: { type: 'text-delta', delta: String(i) },
+          })
+        )
+      );
+      const seqs = results.map((r) => r.event.seq).sort((a, b) => a - b);
+      expect(seqs).toEqual(Array.from({ length: N }, (_, i) => i + 1));
+      expect(new Set(seqs).size).toBe(N);
+
+      const persisted = await store.getEvents(runId);
+      expect(persisted).toHaveLength(N);
+    });
+
+    it('persists the schema_version default when not provided', async () => {
+      const store = new DrizzleEventStore(db as never);
+      const result = await store.appendAssignSeq({
+        runId,
+        eventType: 'start',
+        payload: null,
+      });
+      expect(result.event.schemaVersion).toBe('1');
+    });
+
+    it('persists a custom schema_version when provided', async () => {
+      const store = new DrizzleEventStore(db as never);
+      const result = await store.appendAssignSeq({
+        runId,
+        eventType: 'start',
+        payload: null,
+        schemaVersion: '2',
+      });
+      expect(result.event.schemaVersion).toBe('2');
+    });
+
+    it('supports data-openrush-run-started payload shape', async () => {
+      const store = new DrizzleEventStore(db as never);
+      const result = await store.appendAssignSeq({
+        runId,
+        eventType: 'data-openrush-run-started',
+        payload: {
+          type: 'data-openrush-run-started',
+          data: {
+            runId,
+            agentId: '00000000-0000-0000-0000-000000000000',
+            definitionVersion: 3,
+          },
+        },
+      });
+      expect(result.event.eventType).toBe('data-openrush-run-started');
+      const payload = result.event.payload as {
+        type: string;
+        data: { definitionVersion: number };
+      };
+      expect(payload.type).toBe('data-openrush-run-started');
+      expect(payload.data.definitionVersion).toBe(3);
+    });
+  });
 });

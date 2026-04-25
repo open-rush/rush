@@ -1,9 +1,10 @@
 import type { RunEvent } from '@open-rush/contracts';
 import { type DbClient, runEvents } from '@open-rush/db';
-import { and, desc, eq, gt } from 'drizzle-orm';
+import { and, desc, eq, gt, sql } from 'drizzle-orm';
 import type {
   EventStore,
   EventStoreEvent,
+  EventStoreEventWithoutSeq,
   GapDetectionResult,
   InsertResult,
 } from './event-store.js';
@@ -64,6 +65,52 @@ export class DrizzleEventStore implements EventStore {
     };
   }
 
+  /**
+   * Atomic "assign next seq + insert" for the v1 single-writer event protocol.
+   *
+   * Implementation: runs in a transaction so the advisory lock releases at
+   * commit/rollback. The lock is keyed on `hashtext(run_id::text)`, so
+   * same-run writers serialize while different-run writers proceed in
+   * parallel. Inside the lock a single `INSERT ... SELECT ...` computes
+   * `COALESCE(MAX(seq), 0) + 1` and writes in one statement.
+   *
+   * Rationale (see `.claude/plans/managed-agents-p0-p1.md` §7.3):
+   * - avoids `SELECT ... FOR UPDATE` round-trip
+   * - avoids SERIALIZABLE isolation (no caller-side retry needed)
+   * - advisory lock key is stable across connections / pools
+   */
+  async appendAssignSeq(event: EventStoreEventWithoutSeq): Promise<InsertResult> {
+    const schemaVersion = event.schemaVersion ?? '1';
+    const payload = structuredClone(event.payload) ?? null;
+
+    return await this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${event.runId}::text))`);
+
+      const [inserted] = await tx
+        .insert(runEvents)
+        .values({
+          runId: event.runId,
+          eventType: event.eventType,
+          payload,
+          seq: sql<number>`(COALESCE((SELECT MAX(${runEvents.seq}) FROM ${runEvents} WHERE ${runEvents.runId} = ${event.runId}), 0) + 1)`,
+          schemaVersion,
+        })
+        .returning();
+
+      if (!inserted) {
+        throw new Error(`appendAssignSeq failed for run ${event.runId}`);
+      }
+
+      return {
+        inserted: true,
+        event: clone({
+          ...inserted,
+          createdAt: inserted.createdAt,
+        }),
+      };
+    });
+  }
+
   async getEvents(runId: string, afterSeq = -1): Promise<RunEvent[]> {
     const rows = await this.db
       .select()
@@ -92,11 +139,16 @@ export class DrizzleEventStore implements EventStore {
     }
 
     const seqs = events.map((event) => event.seq).sort((a, b) => a - b);
+    const firstSeq = seqs[0];
     const lastSeq = seqs[seqs.length - 1];
     const missingSeqs: number[] = [];
 
-    for (let i = 0; i <= lastSeq; i += 1) {
-      if (!seqs.includes(i)) {
+    // Scan from the first observed seq (not fixed 0). Legacy path numbers
+    // events from 0; appendAssignSeq numbers from 1. Treating either
+    // origin as valid prevents false gap reports for v1 sequences.
+    const seqSet = new Set(seqs);
+    for (let i = firstSeq; i <= lastSeq; i += 1) {
+      if (!seqSet.has(i)) {
         missingSeqs.push(i);
       }
     }

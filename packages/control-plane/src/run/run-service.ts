@@ -12,6 +12,16 @@ export interface Run {
   connectionMode: string;
   modelId: string | null;
   triggerSource: string;
+  /**
+   * AgentDefinition version snapshot this run is bound to (see
+   * `specs/agent-definition-versioning.md`). Populated by RunService
+   * (task-11) at creation time; nullable for legacy runs created before
+   * the versioning migration (task-3) or before task-11 ships.
+   *
+   * Consumed by the v1 event protocol to emit
+   * `data-openrush-run-started.definitionVersion`.
+   */
+  agentDefinitionVersion: number | null;
   activeStreamId: string | null;
   retryCount: number;
   maxRetries: number;

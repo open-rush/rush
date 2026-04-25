@@ -26,6 +26,7 @@ class MockRunDb implements RunDb {
       connectionMode: input.connectionMode ?? 'sse',
       modelId: input.modelId ?? null,
       triggerSource: input.triggerSource ?? 'api',
+      agentDefinitionVersion: null,
       activeStreamId: null,
       retryCount: 0,
       maxRetries: 3,
@@ -167,6 +168,7 @@ function makeQueuedRun(id: string, agentId = 'agent-1'): Run {
     connectionMode: 'sse',
     modelId: null,
     triggerSource: 'api',
+    agentDefinitionVersion: null,
     activeStreamId: null,
     retryCount: 0,
     maxRetries: 3,
@@ -552,6 +554,229 @@ describe('RunOrchestrator', () => {
       // Should still complete successfully
       const finalRun = await runDb.findById('run-empty-stream');
       expect(finalRun?.status).toBe('completed');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // v1 event protocol feature flag (task-10)
+  //
+  // When `OPENRUSH_V1_EVENTS_ENABLED=true`:
+  // - seq is assigned by EventStore.appendAssignSeq (server-side)
+  // - `data-openrush-run-started` and `data-openrush-run-done` are injected
+  //   around the worker stream
+  // When off (default): legacy in-process counter; no extension events.
+  // -------------------------------------------------------------------------
+
+  describe('v1 events flag: OPENRUSH_V1_EVENTS_ENABLED', () => {
+    const prev = process.env.OPENRUSH_V1_EVENTS_ENABLED;
+    afterEach(() => {
+      if (prev !== undefined) {
+        process.env.OPENRUSH_V1_EVENTS_ENABLED = prev;
+      } else {
+        delete process.env.OPENRUSH_V1_EVENTS_ENABLED;
+      }
+    });
+
+    it('default (flag off) uses legacy counter seq=0,1,2 and emits no openrush-* events', async () => {
+      delete process.env.OPENRUSH_V1_EVENTS_ENABLED;
+      const run = makeQueuedRun('run-flag-off');
+      run.agentDefinitionVersion = 3;
+      runDb.seed(run);
+
+      fetchMock.mockResolvedValueOnce(
+        mockSSEResponse([
+          { type: 'text-delta', delta: 'hi' },
+          { type: 'finish', reason: 'stop' },
+        ])
+      );
+
+      await orchestrator.execute('run-flag-off', 'p', 'agent-1');
+
+      const events = await eventStore.getEvents('run-flag-off');
+      const seqs = events.map((e) => e.seq);
+      // Legacy counter (0-based), no injected openrush-* events.
+      expect(seqs).toEqual([0, 1]);
+      expect(events.map((e) => e.eventType)).toEqual(['text-delta', 'finish']);
+    });
+
+    it('when flag is "true" assigns seq via EventStore starting at 1 and emits run-started/run-done', async () => {
+      process.env.OPENRUSH_V1_EVENTS_ENABLED = 'true';
+      const run = makeQueuedRun('run-flag-on');
+      run.agentDefinitionVersion = 7;
+      runDb.seed(run);
+
+      fetchMock.mockResolvedValueOnce(
+        mockSSEResponse([
+          { type: 'text-start', id: 'm1' },
+          { type: 'text-delta', id: 'm1', delta: 'ok' },
+          { type: 'text-end', id: 'm1' },
+          { type: 'finish', reason: 'stop' },
+        ])
+      );
+
+      await orchestrator.execute('run-flag-on', 'p', 'agent-1');
+
+      const events = await eventStore.getEvents('run-flag-on');
+      const types = events.map((e) => e.eventType);
+      const seqs = events.map((e) => e.seq);
+
+      // Layout: [run-started, ...worker chunks, run-done]
+      expect(types[0]).toBe('data-openrush-run-started');
+      expect(types[types.length - 1]).toBe('data-openrush-run-done');
+      expect(types).toContain('text-start');
+      expect(types).toContain('text-delta');
+      expect(types).toContain('finish');
+
+      // seqs are monotonically increasing, starting at 1, with no gaps.
+      expect(seqs[0]).toBe(1);
+      for (let i = 1; i < seqs.length; i++) {
+        expect(seqs[i]).toBe(seqs[i - 1] + 1);
+      }
+
+      // Verify the run-started payload carries definitionVersion from runDb.
+      const runStarted = events.find((e) => e.eventType === 'data-openrush-run-started');
+      expect(runStarted).toBeDefined();
+      const startedPayload = runStarted?.payload as {
+        type: string;
+        data: { runId: string; agentId: string; definitionVersion: number };
+      };
+      expect(startedPayload.type).toBe('data-openrush-run-started');
+      expect(startedPayload.data.runId).toBe('run-flag-on');
+      expect(startedPayload.data.agentId).toBe('agent-1');
+      expect(startedPayload.data.definitionVersion).toBe(7);
+
+      // Verify the run-done payload carries status=success on success path.
+      const runDone = events.find((e) => e.eventType === 'data-openrush-run-done');
+      expect(runDone).toBeDefined();
+      const donePayload = runDone?.payload as {
+        type: string;
+        data: { status: string };
+      };
+      expect(donePayload.type).toBe('data-openrush-run-done');
+      expect(donePayload.data.status).toBe('success');
+    });
+
+    it('when flag is "true" but run has no agentDefinitionVersion, skips BOTH run-started and run-done (no orphan done)', async () => {
+      // Invariant: `run-done` must never appear without a matching
+      // `run-started`. When `definitionVersion` is null the extension
+      // chunks are both suppressed, keeping the invariant symmetric.
+      process.env.OPENRUSH_V1_EVENTS_ENABLED = 'true';
+      const run = makeQueuedRun('run-flag-on-no-ver');
+      run.agentDefinitionVersion = null;
+      runDb.seed(run);
+
+      fetchMock.mockResolvedValueOnce(mockSSEResponse([{ type: 'finish', reason: 'stop' }]));
+
+      await orchestrator.execute('run-flag-on-no-ver', 'p', 'agent-1');
+
+      const events = await eventStore.getEvents('run-flag-on-no-ver');
+      const types = events.map((e) => e.eventType);
+      expect(types).not.toContain('data-openrush-run-started');
+      expect(types).not.toContain('data-openrush-run-done');
+    });
+
+    it('when flag is "true" and worker returns a network failure, emits run-done with status=failed', async () => {
+      process.env.OPENRUSH_V1_EVENTS_ENABLED = 'true';
+      const run = makeQueuedRun('run-flag-on-fail');
+      run.agentDefinitionVersion = 2;
+      runDb.seed(run);
+
+      fetchMock.mockResolvedValueOnce(mockSSEErrorResponse(500));
+
+      await orchestrator.execute('run-flag-on-fail', 'p', 'agent-1');
+
+      const events = await eventStore.getEvents('run-flag-on-fail');
+      const types = events.map((e) => e.eventType);
+      // Started was emitted (run-started before the fetch call), so run-done
+      // (status=failed) must also be emitted.
+      expect(types).toContain('data-openrush-run-started');
+      const runDone = events.find((e) => e.eventType === 'data-openrush-run-done');
+      expect(runDone).toBeDefined();
+      const donePayload = runDone?.payload as {
+        type: string;
+        data: { status: string; error?: string };
+      };
+      expect(donePayload.data.status).toBe('failed');
+      expect(donePayload.data.error).toBeDefined();
+
+      // Run is in failed state
+      const final = await runDb.findById('run-flag-on-fail');
+      expect(final?.status).toBe('failed');
+    });
+
+    it('emits run-done at most once even when finalize() throws after stream success', async () => {
+      // If the stream completes successfully and `run-done(success)` has
+      // been emitted, a subsequent `finalize()` exception must NOT produce
+      // a second, contradictory `run-done(failed)` event.
+      process.env.OPENRUSH_V1_EVENTS_ENABLED = 'true';
+      const run = makeQueuedRun('run-done-once');
+      run.agentDefinitionVersion = 4;
+      runDb.seed(run);
+      fetchMock.mockResolvedValueOnce(mockSSEResponse([{ type: 'finish', reason: 'stop' }]));
+
+      // Force finalize() to throw by making updateStatus reject for any
+      // finalizing_* target. We monkey-patch RunService.transition via
+      // runDb.updateStatus to throw only when the target state is
+      // `finalizing_prepare` (the first step of finalize()).
+      const origUpdate = runDb.updateStatus.bind(runDb);
+      runDb.updateStatus = async (id, status, extra) => {
+        if (status === 'finalizing_prepare') {
+          throw new Error('finalize boom');
+        }
+        return origUpdate(id, status, extra);
+      };
+
+      await orchestrator.execute('run-done-once', 'p', 'agent-1');
+
+      const events = await eventStore.getEvents('run-done-once');
+      const dones = events.filter((e) => e.eventType === 'data-openrush-run-done');
+      expect(dones).toHaveLength(1);
+      // Preserved the success status since that's what fired first.
+      const donePayload = dones[0].payload as { data: { status: string } };
+      expect(donePayload.data.status).toBe('success');
+    });
+
+    it('does not emit run-done when run-started was skipped (null definitionVersion)', async () => {
+      // run-done must never precede run-started. When definitionVersion
+      // is null the injector skips run-started, which must also suppress
+      // the catch-branch run-done(failed) on a pre-stream failure.
+      process.env.OPENRUSH_V1_EVENTS_ENABLED = 'true';
+      const run = makeQueuedRun('run-no-version-fail');
+      run.agentDefinitionVersion = null;
+      runDb.seed(run);
+      // Sandbox creation fails → we reach catch before the stream even
+      // starts; since run-started was never emitted (and also would have
+      // been skipped for null version), no run-done should appear.
+      sandboxProvider.shouldFailCreate = true;
+
+      await orchestrator.execute('run-no-version-fail', 'p', 'agent-1');
+
+      const events = await eventStore.getEvents('run-no-version-fail');
+      const types = events.map((e) => e.eventType);
+      expect(types).not.toContain('data-openrush-run-started');
+      expect(types).not.toContain('data-openrush-run-done');
+      const final = await runDb.findById('run-no-version-fail');
+      expect(final?.status).toBe('failed');
+    });
+
+    it('treats unset / non-lowercase-"true" values as off (strict equality)', async () => {
+      // Strict check: only the lowercase literal 'true' activates v1.
+      // Any other value — including case variants like 'TRUE' / 'True',
+      // and non-boolean strings — is treated as OFF. This avoids the
+      // "accidentally-on" class of bugs from tolerant boolean parsing.
+      for (const v of ['false', '0', 'FALSE', 'TRUE', 'True', '1', 'yes', '']) {
+        process.env.OPENRUSH_V1_EVENTS_ENABLED = v;
+        const runId = `run-flag-val-${v || 'empty'}`;
+        const run = makeQueuedRun(runId);
+        run.agentDefinitionVersion = 1;
+        runDb.seed(run);
+        fetchMock.mockResolvedValueOnce(mockSSEResponse([{ type: 'finish', reason: 'stop' }]));
+        await orchestrator.execute(runId, 'p', 'agent-1');
+        const events = await eventStore.getEvents(runId);
+        const types = events.map((e) => e.eventType);
+        expect(types).not.toContain('data-openrush-run-started');
+        expect(types).not.toContain('data-openrush-run-done');
+      }
     });
   });
 });

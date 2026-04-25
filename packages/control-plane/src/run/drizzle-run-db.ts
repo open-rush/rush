@@ -19,6 +19,7 @@ function mapRow(row: RunRow): Run {
     connectionMode: row.connectionMode,
     modelId: row.modelId,
     triggerSource: row.triggerSource,
+    agentDefinitionVersion: row.agentDefinitionVersion,
     activeStreamId: row.activeStreamId,
     retryCount: row.retryCount,
     maxRetries: row.maxRetries,

@@ -3,13 +3,35 @@ import type { EventStore } from '../event-store.js';
 import { AgentBridge } from './agent-bridge.js';
 import type { AgentExecutor } from './agent-executor.js';
 import type { CheckpointService } from './checkpoint-service.js';
-import type { RunService } from './run-service.js';
+import type { Run, RunService } from './run-service.js';
 import {
   createErrorHandler,
   createIncrementalSave,
   createStreamLogger,
   StreamPipeline,
 } from './stream-middleware.js';
+
+/**
+ * Feature flag guarding the v1 event protocol (single-writer model + the
+ * `data-openrush-*` extension events).
+ *
+ * Default: **OFF**. Strictly accepts only the literal lowercase `"true"`
+ * — any other value (including `TRUE`, `True`, `1`, non-empty arbitrary
+ * strings) is treated as OFF. This matches the documented flag contract
+ * in the plan and avoids accidental half-on state from 12-factor-style
+ * boolean tolerance.
+ *
+ * When on, activates:
+ *  - {@link EventStore.appendAssignSeq} (server-assigned monotonic seq)
+ *  - `data-openrush-run-started` / `data-openrush-run-done` injection
+ *
+ * See `.claude/plans/managed-agents-p0-p1.md` §10 "发布策略": flag stays off
+ * until task-19 flips it on atomically with the frontend migration, so the
+ * existing production stream behaviour remains byte-for-byte identical.
+ */
+export function isV1EventsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.OPENRUSH_V1_EVENTS_ENABLED === 'true';
+}
 
 export interface RunOrchestratorDeps {
   runService: RunService;
@@ -35,6 +57,17 @@ export class RunOrchestrator {
     const isFollowUp = run?.parentRunId != null;
     let sandboxId: string | null = null;
     let agentContext: Awaited<ReturnType<AgentExecutor['prepareContext']>> | null = null;
+    const v1EventsEnabled = isV1EventsEnabled();
+    // Tracks whether a `data-openrush-run-started` chunk was actually
+    // appended. Stays false when `emitRunStarted` no-ops (e.g. when
+    // `agentDefinitionVersion` is null), which guarantees `run-done` can
+    // never precede a missing `run-started`.
+    let runStartedEmitted = false;
+    // Tracks whether any `data-openrush-run-done` chunk has been appended.
+    // Guarantees at-most-once terminal marker per run — without this, a
+    // successful stream followed by a `finalize()` exception could emit
+    // both `run-done(success)` and then `run-done(failed)`.
+    let runDoneEmitted = false;
 
     try {
       // 1. queued → provisioning
@@ -77,6 +110,16 @@ export class RunOrchestrator {
       const agentBridge = new AgentBridge({ agentWorkerUrl: endpointUrl });
       await this.deps.runService.transition(runId, 'running');
 
+      // Inject Open-rush extension event `data-openrush-run-started` before
+      // the worker stream begins. Uses the single-writer EventStore entry so
+      // the extension chunk shares the per-run seq with worker-emitted chunks.
+      // Behind the v1 flag to preserve pre-task-19 stream fidelity.
+      if (v1EventsEnabled) {
+        // `emitRunStarted` returns true only if an event was actually
+        // written (it no-ops when `agentDefinitionVersion` is null).
+        runStartedEmitted = await this.emitRunStarted(runId, agentId, run);
+      }
+
       // Build prompt with restored context if available
       const fullPrompt = restoredContext
         ? `[Restored from checkpoint]\n\nPrevious context:\n${restoredContext}\n\nNew prompt:\n${prompt}`
@@ -99,14 +142,43 @@ export class RunOrchestrator {
       });
 
       // 5. Consume SSE stream
-      await this.consumeStream(runId, response);
+      await this.consumeStream(runId, response, v1EventsEnabled);
+
+      // 5b. Inject `data-openrush-run-done` {status: 'success'} (v1 only).
+      // Gate on `runStartedEmitted` to enforce the "no done-before-started"
+      // invariant on the success path too: when `data-openrush-run-started`
+      // was skipped (e.g. null `agentDefinitionVersion`), skip `run-done`
+      // as well so consumers never see an orphaned terminal marker.
+      //
+      // Set `runDoneEmitted` *after* the emitAssignSeq call succeeds so
+      // that if the append itself throws, the catch branch below can
+      // still attempt a `run-done(failed)` replacement — preserving the
+      // at-least-one-terminal-marker guarantee.
+      if (v1EventsEnabled && runStartedEmitted) {
+        await this.emitRunDone(runId, 'success');
+        runDoneEmitted = true;
+      }
 
       // 6. Finalization
       await this.finalize(runId);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Emit a `run-done` terminal marker so SSE② consumers observe the
+      // terminal state even if the later transition fails. Guard with:
+      //   - `runStartedEmitted` (no done-before-started)
+      //   - `!runDoneEmitted`   (at-most-once terminal marker per run)
+      // Best-effort — errors here do not mask the original failure.
+      if (v1EventsEnabled && runStartedEmitted && !runDoneEmitted) {
+        try {
+          await this.emitRunDone(runId, 'failed', message);
+          runDoneEmitted = true;
+        } catch (emitErr) {
+          console.error('[orchestrator] Failed to emit run-done on error:', emitErr);
+        }
+      }
       try {
         await this.deps.runService.transition(runId, 'failed', {
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: message,
         });
       } catch {
         // Best-effort
@@ -194,17 +266,38 @@ export class RunOrchestrator {
     await this.deps.runService.transition(runId, 'completed');
   }
 
-  private async consumeStream(runId: string, response: Response): Promise<void> {
+  /**
+   * Consume the SSE① UIMessageChunk stream from the agent-worker and
+   * persist each chunk via the EventStore.
+   *
+   * When `v1Enabled` is true (OPENRUSH_V1_EVENTS_ENABLED): uses
+   * {@link EventStore.appendAssignSeq} so seq is assigned atomically by the
+   * DB (single-writer contract, see §7.3). The incoming chunk's `seq`
+   * field carried through the pipeline is **advisory only** for logging;
+   * the authoritative seq is in the EventStore insert result.
+   *
+   * When false (default): legacy behaviour — an in-process counter assigns
+   * seq starting at 0 via `EventStore.append`.
+   */
+  private async consumeStream(runId: string, response: Response, v1Enabled = false): Promise<void> {
     const pipeline = new StreamPipeline();
 
     pipeline.use(
       createIncrementalSave(async (event) => {
-        await this.deps.eventStore.append({
-          runId,
-          eventType: event.type,
-          payload: event.data,
-          seq: event.seq,
-        });
+        if (v1Enabled) {
+          await this.deps.eventStore.appendAssignSeq({
+            runId,
+            eventType: event.type,
+            payload: event.data,
+          });
+        } else {
+          await this.deps.eventStore.append({
+            runId,
+            eventType: event.type,
+            payload: event.data,
+            seq: event.seq,
+          });
+        }
       }, 1)
     );
 
@@ -252,5 +345,60 @@ export class RunOrchestrator {
         }
       }
     }
+  }
+
+  /**
+   * Emit `data-openrush-run-started` via the single-writer EventStore.
+   *
+   * Payload shape mirrors `openrushRunStartedPartSchema` in
+   * `packages/contracts/src/v1/runs.ts`. `definitionVersion` is derived
+   * from `runs.agent_definition_version` (task-3 column); the Zod schema
+   * requires `definitionVersion ≥ 1`, so when the version is null (legacy
+   * rows, or runs created before task-11 ships) we skip the injection
+   * entirely rather than emit an invalid payload.
+   *
+   * @returns `true` if an event was actually appended, `false` if skipped.
+   *          Callers use this to gate the matching `run-done` emission so
+   *          consumers never see a terminal marker without a preceding
+   *          `run-started`.
+   */
+  private async emitRunStarted(runId: string, agentId: string, run: Run | null): Promise<boolean> {
+    const definitionVersion = run?.agentDefinitionVersion;
+    if (definitionVersion == null) {
+      return false;
+    }
+    await this.deps.eventStore.appendAssignSeq({
+      runId,
+      eventType: 'data-openrush-run-started',
+      payload: {
+        type: 'data-openrush-run-started',
+        data: {
+          runId,
+          agentId,
+          definitionVersion,
+        },
+      },
+    });
+    return true;
+  }
+
+  /**
+   * Emit `data-openrush-run-done` via the single-writer EventStore.
+   * Status maps onto the run terminal state; `error` carries the failure
+   * message when non-empty.
+   */
+  private async emitRunDone(
+    runId: string,
+    status: 'success' | 'failed' | 'cancelled',
+    error?: string
+  ): Promise<void> {
+    await this.deps.eventStore.appendAssignSeq({
+      runId,
+      eventType: 'data-openrush-run-done',
+      payload: {
+        type: 'data-openrush-run-done',
+        data: error ? { status, error } : { status },
+      },
+    });
   }
 }

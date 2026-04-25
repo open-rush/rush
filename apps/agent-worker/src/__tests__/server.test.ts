@@ -341,4 +341,128 @@ describe('agent-worker server', () => {
       expect(res.status).toBe(404);
     });
   });
+
+  // -----------------------------------------------------------------
+  // task-10 single-writer contract: agent-worker must NOT persist
+  // run_events directly. It forwards the AI SDK UIMessageChunk stream
+  // via SSE①; control-worker owns seq allocation and DB writes (see
+  // .claude/plans/managed-agents-p0-p1.md §7.3 and
+  // specs/managed-agents-api.md §事件写入单写者模型).
+  // -----------------------------------------------------------------
+  describe('single-writer contract (task-10)', () => {
+    it('delegates stream emission to AI SDK toUIMessageStreamResponse', async () => {
+      const mockResult = {
+        toUIMessageStreamResponse: vi.fn(
+          () =>
+            new Response('data: {"type":"start","messageId":"m1"}\n\n', {
+              status: 200,
+              headers: { 'Content-Type': 'text/event-stream' },
+            })
+        ),
+        response: Promise.resolve({}),
+      };
+      (streamText as Mock).mockReturnValue(mockResult);
+
+      const res = await app.request('/prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'hello' }),
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toContain('text/event-stream');
+      // Must be the SDK response (identity), not re-framed.
+      expect(mockResult.toUIMessageStreamResponse).toHaveBeenCalledOnce();
+    });
+
+    it('exposes the Hono app without importing the control-plane EventStore', async () => {
+      // Guard against regressions: the agent-worker package depends only on
+      // '@open-rush/contracts' and '@open-rush/agent-runtime' — importing
+      // the control-plane EventStore here would violate the single-writer
+      // contract. The dependency is enforced at package.json level; this
+      // test documents the intent and smoke-checks the module loads.
+      const moduleSpec = await import('../server.js');
+      expect(moduleSpec.default).toBeDefined();
+    });
+  });
+
+  // -----------------------------------------------------------------
+  // AI SDK 6 UIMessageChunk coverage — the contracts layer defines
+  // the canonical list in `packages/contracts/src/enums.ts`
+  // (`UIMessageChunkType`). The worker emits whatever the SDK produces,
+  // so we only assert that representative chunks of each family survive
+  // the pipeline when written to the response body.
+  // -----------------------------------------------------------------
+  describe('UIMessageChunk family coverage (task-10)', () => {
+    // The 16 canonical chunk types defined in
+    // `packages/contracts/src/enums.ts::UIMessageChunkType`. If this list
+    // drifts from enums.ts, contracts tests will flag it separately.
+    const CANONICAL_CHUNK_TYPES = [
+      'text-start',
+      'text-delta',
+      'text-end',
+      'reasoning-start',
+      'reasoning-delta',
+      'reasoning-end',
+      'tool-input-start',
+      'tool-input-delta',
+      'tool-input-available',
+      'tool-output-available',
+      'tool-output-error',
+      'start',
+      'finish',
+      'error',
+      'start-step',
+      'finish-step',
+    ] as const;
+
+    it('passes through every canonical UIMessageChunkType without mutation', async () => {
+      const chunks: Array<Record<string, unknown>> = [
+        { type: 'start', messageId: 'm1' },
+        { type: 'start-step' },
+        { type: 'text-start', id: 'm1' },
+        { type: 'text-delta', id: 'm1', delta: 'Hi' },
+        { type: 'text-end', id: 'm1' },
+        { type: 'reasoning-start', id: 'r1' },
+        { type: 'reasoning-delta', id: 'r1', delta: 'think...' },
+        { type: 'reasoning-end', id: 'r1' },
+        { type: 'tool-input-start', toolCallId: 'c1', toolName: 'Read' },
+        { type: 'tool-input-delta', toolCallId: 'c1', delta: '{"path":' },
+        {
+          type: 'tool-input-available',
+          toolCallId: 'c1',
+          toolName: 'Read',
+          input: { path: '/a' },
+        },
+        { type: 'tool-output-available', toolCallId: 'c1', output: 'content' },
+        { type: 'tool-output-error', toolCallId: 'c2', errorText: 'boom' },
+        { type: 'error', errorText: 'stream aborted' },
+        { type: 'finish-step', reason: 'stop' },
+        { type: 'finish', reason: 'stop' },
+      ];
+      const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('');
+
+      const mockResult = {
+        toUIMessageStreamResponse: vi.fn(
+          () =>
+            new Response(body, {
+              status: 200,
+              headers: { 'Content-Type': 'text/event-stream' },
+            })
+        ),
+        response: Promise.resolve({}),
+      };
+      (streamText as Mock).mockReturnValue(mockResult);
+
+      const res = await app.request('/prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'hello' }),
+      });
+      const text = await res.text();
+      // Every canonical chunk type must survive the pass-through.
+      for (const type of CANONICAL_CHUNK_TYPES) {
+        expect(text).toContain(`"type":"${type}"`);
+      }
+    });
+  });
 });

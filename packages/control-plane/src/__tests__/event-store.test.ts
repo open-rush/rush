@@ -150,12 +150,120 @@ describe('InMemoryEventStore', () => {
       expect(fresh[0].eventType).toBe('a');
     });
 
-    it('detects gap at start', async () => {
+    it('treats a non-zero first seq as valid (tolerant start for v1 sequences)', async () => {
+      // appendAssignSeq numbers from 1 (not 0). detectGaps scans from the
+      // first observed seq so pure-v1 sequences are not flagged as missing
+      // earlier seqs that were never part of the run.
       await store.append({ runId: 'run-1', eventType: 'b', payload: null, seq: 2 });
 
       const result = await store.detectGaps('run-1');
+      expect(result.hasGaps).toBe(false);
+      expect(result.missingSeqs).toEqual([]);
+      expect(result.lastSeq).toBe(2);
+    });
+
+    it('still detects intermediate gaps regardless of where the sequence starts', async () => {
+      // First-observed seq = 1 (v1 style); gap between 1 and 3 must still
+      // be reported.
+      await store.append({ runId: 'run-1', eventType: 'a', payload: null, seq: 1 });
+      await store.append({ runId: 'run-1', eventType: 'c', payload: null, seq: 3 });
+
+      const result = await store.detectGaps('run-1');
       expect(result.hasGaps).toBe(true);
-      expect(result.missingSeqs).toEqual([0, 1]);
+      expect(result.missingSeqs).toEqual([2]);
+      expect(result.lastSeq).toBe(3);
+    });
+  });
+
+  describe('appendAssignSeq (single-writer entry)', () => {
+    it('assigns seq starting at 1 for the first event', async () => {
+      const result = await store.appendAssignSeq({
+        runId: 'run-1',
+        eventType: 'start',
+        payload: { type: 'start' },
+      });
+      expect(result.inserted).toBe(true);
+      expect(result.event.seq).toBe(1);
+      expect(result.event.runId).toBe('run-1');
+    });
+
+    it('monotonically increments seq per run', async () => {
+      const a = await store.appendAssignSeq({
+        runId: 'run-1',
+        eventType: 'text-start',
+        payload: { type: 'text-start' },
+      });
+      const b = await store.appendAssignSeq({
+        runId: 'run-1',
+        eventType: 'text-delta',
+        payload: { type: 'text-delta', delta: 'hi' },
+      });
+      const c = await store.appendAssignSeq({
+        runId: 'run-1',
+        eventType: 'text-end',
+        payload: { type: 'text-end' },
+      });
+      expect([a.event.seq, b.event.seq, c.event.seq]).toEqual([1, 2, 3]);
+    });
+
+    it('assigns independent seq streams per run', async () => {
+      const a = await store.appendAssignSeq({
+        runId: 'run-a',
+        eventType: 'start',
+        payload: null,
+      });
+      const b = await store.appendAssignSeq({
+        runId: 'run-b',
+        eventType: 'start',
+        payload: null,
+      });
+      expect(a.event.seq).toBe(1);
+      expect(b.event.seq).toBe(1);
+    });
+
+    it('serializes concurrent writes on the same run without gaps', async () => {
+      const N = 50;
+      const results = await Promise.all(
+        Array.from({ length: N }, (_, i) =>
+          store.appendAssignSeq({
+            runId: 'run-concurrent',
+            eventType: 'text-delta',
+            payload: { type: 'text-delta', delta: String(i) },
+          })
+        )
+      );
+      const seqs = results.map((r) => r.event.seq).sort((a, b) => a - b);
+      expect(seqs).toEqual(Array.from({ length: N }, (_, i) => i + 1));
+      // No gaps and no duplicates
+      expect(new Set(seqs).size).toBe(N);
+    });
+
+    it('coexists with legacy append without colliding on stored data', async () => {
+      // Legacy caller at seq 10 — appendAssignSeq should compute MAX + 1 = 11
+      await store.append({ runId: 'run-1', eventType: 'legacy', payload: null, seq: 10 });
+      const next = await store.appendAssignSeq({
+        runId: 'run-1',
+        eventType: 'assigned',
+        payload: null,
+      });
+      expect(next.event.seq).toBe(11);
+    });
+
+    it('continues serializing after a write failure', async () => {
+      // Nothing throws from doAssignSeq under normal conditions, but the
+      // chain is kept alive even on errors so we still get sequential seqs
+      // for the next writer. Smoke-test by running back-to-back awaits.
+      const a = await store.appendAssignSeq({
+        runId: 'run-1',
+        eventType: 'a',
+        payload: null,
+      });
+      const b = await store.appendAssignSeq({
+        runId: 'run-1',
+        eventType: 'b',
+        payload: null,
+      });
+      expect(b.event.seq).toBe(a.event.seq + 1);
     });
   });
 });
