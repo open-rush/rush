@@ -200,7 +200,7 @@ Source of truth 见 `.claude/plans/managed-agents-p0-p1.md`。本文件仅用于
       - README + 示例
       - verify: `./docs/execution/verify.sh task-16`
 
-- [ ] `task-17-readme-and-docs` — **Agent-C**
+- [x] `task-17-readme-and-docs` — **Agent-C**
       域: `README.md`, `docs/quickstart.md`, `docs/api.md`
       依赖: all APIs + task-16
       验收:
