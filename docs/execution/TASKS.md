@@ -210,7 +210,7 @@ Source of truth 见 `.claude/plans/managed-agents-p0-p1.md`。本文件仅用于
       - api.md 链接到 openapi spec
       - verify: `./docs/execution/verify.sh task-17`
 
-- [ ] `task-18-e2e-tests` — **Agent-C**
+- [x] `task-18-e2e-tests` — **Agent-C**
       域: `apps/web/e2e/v1-api.spec.ts` + 相关 fixture
       依赖: all APIs
       验收:
