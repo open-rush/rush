@@ -145,7 +145,7 @@ id: 5
 data: {"type":"data-openrush-run-done","data":{"status":"success"}}
 ```
 
-**Reconnect after disconnection**: pass `Last-Event-ID: <last seq>` header. The server replays `run_events` with `seq > N`, then attaches to the live Redis stream. No query-string cursor is used — single protocol.
+**Reconnect after disconnection**: pass `Last-Event-ID: <last seq>` header. The server replays `run_events` rows with `seq > N`, then attaches to the active-run notification path (handler-side choice — polling by default; pub/sub / hybrid are client-transparent alternatives). No query-string cursor is used — single protocol.
 
 ### 3.4 Append a follow-up message (second Run)
 
@@ -176,7 +176,7 @@ curl -X POST "$OPENRUSH_BASE/api/v1/agents/<agentId>/runs/<runId>/cancel" \
 | `curl` returns `401 UNAUTHORIZED` | Token missing / expired / revoked. Re-issue and export `OPENRUSH_TOKEN`. |
 | `403 FORBIDDEN` with a valid token | Token scopes too narrow. Re-issue with the scope listed in [`specs/managed-agents-api.md` §Scope 矩阵](../specs/managed-agents-api.md). |
 | `503` on every `/api/v1/*` call | Feature flag `OPENRUSH_V1_ENABLED` is off. Set it to `true` in `apps/web/.env.local`. |
-| SSE immediately closes after replay | The run already reached `success`/`failed`/`cancelled`. Spec: terminal runs full-replay then close. |
+| SSE immediately closes after replay | `runs.status` already reached a state-machine terminal (`completed` / `failed`; wire shows `cancelled` for user-cancels). Spec: terminal runs full-replay then close — not a bug. |
 | Agent worker can't reach Claude | Verify `ANTHROPIC_API_KEY` / Bedrock creds in `apps/agent-worker/.env.local`. |
 
 ---

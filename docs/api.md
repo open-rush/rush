@@ -170,12 +170,29 @@ Aligned with **AI SDK v6 UIMessageChunk** (wire-level streaming shape used by `u
 Single protocol, `Last-Event-ID` only (no query cursor):
 
 1. Client disconnects at `seq = N`.
-2. Client reconnects with `Last-Event-ID: N`.
+2. Client reconnects with `Last-Event-ID: N` (browsers set this automatically from the last `id:` field).
 3. Server replays `SELECT * FROM run_events WHERE run_id = ? AND seq > N ORDER BY seq`.
-4. Server attaches to the Redis live stream ([`packages/stream`](../packages/stream)) and forwards new events.
-5. Runs in a terminal state (`success`/`failed`/`cancelled`) send the full replay then close the connection.
+4. Server then attaches to the active-run notification path for live events.
+5. When `runs.status` reaches a state-machine terminal (`completed` or `failed`; the wire shows `cancelled` for user-cancels), the server replays any trailing events then closes the connection.
 
-See [`specs/managed-agents-api.md` §断线重连](../specs/managed-agents-api.md) for the binding decision trail.
+**Invariants (hold regardless of handler choice)**:
+
+- `run_events` is the single-writer source of truth (control-worker `EventStore`, see [`packages/control-plane`](../packages/control-plane)).
+- Every SSE frame carries `id: <seq>` — on both replay and live paths.
+- `seq` is strictly monotonic; live `seq` is always greater than the largest replay `seq`.
+- Connection close is driven by `runs.status` reaching state-machine terminal — **not** by the `data-openrush-run-done.status` field, which is a display-layer hint only.
+
+### Live-notification implementation (handler choice, client-transparent)
+
+How the server is notified of new events on an active run is a handler-side decision and does **not** affect the wire protocol:
+
+| Option | Mechanism | When |
+| --- | --- | --- |
+| `run_events` polling | Periodic (~500 ms) query for `seq > lastSentSeq` | **P0 default** — smallest blast radius, no Redis dependency |
+| StreamRegistry pub/sub | Subscribe to Redis channel, publish forwards immediately | P1+ — lower latency on active runs |
+| Hybrid | Polling fallback plus pub/sub fast-path | P2+ — high-load production |
+
+The current `GET /api/v1/agents/:agentId/runs/:runId/events` handler (task-14) uses **polling**. Future swaps to pub/sub or hybrid are transparent to clients because the invariants above remain intact. See [`specs/managed-agents-api.md` §断线重连, §实时通知实现选项](../specs/managed-agents-api.md) for the binding decision trail.
 
 ---
 
