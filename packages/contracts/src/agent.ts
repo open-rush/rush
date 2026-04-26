@@ -50,6 +50,10 @@ export const ProjectAgent = z.object({
 export type ProjectAgent = z.infer<typeof ProjectAgent>;
 
 export const SetCurrentProjectAgentRequest = z.object({
-  agentId: z.string().uuid(),
+  // `null` = clear current binding (no project default). Used after archiving
+  // the current AgentDefinition when no replacement exists — matches legacy
+  // `DELETE /api/agents/:id` behavior which set `isCurrent=false` for the
+  // removed binding without picking a replacement.
+  agentId: z.string().uuid().nullable(),
 });
 export type SetCurrentProjectAgentRequest = z.infer<typeof SetCurrentProjectAgentRequest>;

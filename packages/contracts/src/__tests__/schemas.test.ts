@@ -240,6 +240,15 @@ describe('SetCurrentProjectAgentRequest', () => {
     const req = SetCurrentProjectAgentRequest.parse({ agentId: UUID });
     expect(req.agentId).toBe(UUID);
   });
+
+  it('allows agentId: null to clear the binding', () => {
+    const req = SetCurrentProjectAgentRequest.parse({ agentId: null });
+    expect(req.agentId).toBeNull();
+  });
+
+  it('rejects non-UUID strings', () => {
+    expect(() => SetCurrentProjectAgentRequest.parse({ agentId: 'not-a-uuid' })).toThrow();
+  });
 });
 
 // --- Project ---

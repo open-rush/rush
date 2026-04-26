@@ -67,6 +67,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const store = new DrizzleAgentConfigStore(db);
 
   try {
+    if (parsed.data.agentId === null) {
+      // `agentId: null` → clear the project's current agent binding. Used
+      // after archiving the current AgentDefinition when no replacement
+      // candidate exists (matches legacy DELETE /api/agents/:id semantics).
+      await projectAgentService.clearCurrentAgent(projectId);
+      return apiSuccess({ currentAgent: null, binding: null });
+    }
     const binding = await projectAgentService.setCurrentAgent(projectId, parsed.data.agentId);
     const agent = await store.getById(parsed.data.agentId);
     return apiSuccess({ currentAgent: agent, binding });

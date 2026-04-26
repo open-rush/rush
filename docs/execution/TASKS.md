@@ -218,7 +218,7 @@ Source of truth 见 `.claude/plans/managed-agents-p0-p1.md`。本文件仅用于
       - CI 集成(postgres + redis docker-compose)
       - verify: `./docs/execution/verify.sh task-18`
 
-- [ ] `task-19-frontend-migration-and-legacy-cleanup` — **Agent-C**
+- [x] `task-19-frontend-migration-and-legacy-cleanup` — **Agent-C**
       域: `apps/web/app/**/*.tsx`,删除 `apps/web/app/api/` 下**非 v1 非 auth 非 health** 的 route
       依赖: task-8, task-9, task-12, task-13, task-14, task-18
       验收:

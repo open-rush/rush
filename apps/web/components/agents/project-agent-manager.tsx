@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { MultiSelectOption } from '@/components/ui/multi-select';
+import { archiveAgentDefinition } from '@/lib/api/archive-agent';
 import { fetchAllV1 } from '@/lib/api/v1-list';
 
 interface ProjectAgentManagerProps {
@@ -192,15 +193,19 @@ export function ProjectAgentManager({ projectId }: ProjectAgentManagerProps) {
       setMessage(null);
       setError(null);
       try {
-        // TODO(task-19 Step 2): migrate to POST /api/v1/agent-definitions/:id/archive.
-        // Blocker: legacy DELETE rebinds project.currentAgentId on removal
-        // (apps/web/app/api/agents/[id]/route.ts:117-130); v1 archive doesn't.
-        // Step 2 must add the rebind step or extend v1 archive before deleting legacy.
-        const res = await fetch(`/api/agents/${agentId}`, { method: 'DELETE' });
-        const json = await res.json();
-        if (!res.ok) {
-          throw new Error(json.error ?? 'Failed to delete agent');
-        }
+        // v1 migration: archive via POST /api/v1/agent-definitions/:id/archive,
+        // then (if the archived agent was the project's current binding) rebind
+        // to another non-archived definition. See lib/api/archive-agent.ts.
+        await archiveAgentDefinition({
+          projectId,
+          agentId,
+          // v1 GET /api/v1/agent-definitions exposes `archivedAt`; filter by
+          // that rather than legacy `status` (which v1 does not return).
+          candidates: agents.map((a) => ({
+            id: a.id,
+            archivedAt: (a as { archivedAt?: string | Date | null }).archivedAt ?? null,
+          })),
+        });
 
         if (selectedAgentId === agentId) {
           setSelectedAgentId(null);
@@ -210,12 +215,22 @@ export function ProjectAgentManager({ projectId }: ProjectAgentManagerProps) {
         setMessage('Agent deleted.');
         await load();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete agent');
+        const baseMsg = err instanceof Error ? err.message : 'Failed to delete agent';
+        // Partial failure: archive committed but rebind failed. Refresh so the
+        // user sees the archived row is gone and can "Set Current" on another.
+        if (baseMsg.includes('Archive succeeded but rebind failed')) {
+          setError(`${baseMsg}. Refresh the list and set another agent as Current.`);
+          await load().catch(() => {
+            /* If reload itself fails, leave the error message — user can retry. */
+          });
+        } else {
+          setError(baseMsg);
+        }
       } finally {
         setDeletingId(null);
       }
     },
-    [load, selectedAgentId]
+    [agents, load, projectId, selectedAgentId]
   );
 
   if (loading) {

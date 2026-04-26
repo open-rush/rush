@@ -46,6 +46,20 @@ export class ProjectAgentService {
     return row ? mapRow(row) : null;
   }
 
+  /**
+   * Clears the project's current agent binding — flips `isCurrent=false` on
+   * any row for this project. Idempotent (no rows is fine). Used after
+   * archiving the current AgentDefinition when no replacement candidate
+   * exists. Matches legacy `DELETE /api/agents/:id` behavior which set
+   * `isCurrent=false` without picking a replacement.
+   */
+  async clearCurrentAgent(projectId: string): Promise<void> {
+    await this.db
+      .update(projectAgents)
+      .set({ isCurrent: false, updatedAt: new Date() })
+      .where(eq(projectAgents.projectId, projectId));
+  }
+
   async setCurrentAgent(
     projectId: string,
     agentId: string,

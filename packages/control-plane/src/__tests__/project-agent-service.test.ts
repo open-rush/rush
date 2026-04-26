@@ -173,6 +173,34 @@ describe('ProjectAgentService', () => {
       'Agent not found in project'
     );
   });
+
+  it('clearCurrentAgent flips isCurrent=false on the project binding', async () => {
+    const user = await createTestUser(db);
+    const project = await createTestProject(db, user.id);
+    const agentA = await createTestAgent(db, project.id, user.id);
+    const service = new ProjectAgentService(db as never);
+
+    await service.setCurrentAgent(project.id, agentA.id);
+    expect(await service.getCurrentAgent(project.id)).not.toBeNull();
+
+    await service.clearCurrentAgent(project.id);
+    expect(await service.getCurrentAgent(project.id)).toBeNull();
+
+    // The binding row still exists (archive is not row deletion), but its
+    // isCurrent flag is now false. Matches legacy DELETE /api/agents/:id.
+    const bindings = await service.listByProject(project.id);
+    expect(bindings).toHaveLength(1);
+    expect(bindings[0].isCurrent).toBe(false);
+  });
+
+  it('clearCurrentAgent is idempotent on an empty project (no throw)', async () => {
+    const user = await createTestUser(db);
+    const project = await createTestProject(db, user.id);
+    const service = new ProjectAgentService(db as never);
+
+    await expect(service.clearCurrentAgent(project.id)).resolves.toBeUndefined();
+    expect(await service.getCurrentAgent(project.id)).toBeNull();
+  });
 });
 
 async function createTestUser(db: TestDb): Promise<typeof users.$inferSelect> {

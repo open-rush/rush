@@ -1,8 +1,7 @@
 import { UpdateAgentRequest } from '@open-rush/contracts';
-import { DrizzleAgentConfigStore, ProjectAgentService } from '@open-rush/control-plane';
-import { agents, getDbClient, projectAgents } from '@open-rush/db';
+import { DrizzleAgentConfigStore } from '@open-rush/control-plane';
+import { getDbClient } from '@open-rush/db';
 import { createLogger } from '@open-rush/observability';
-import { and, eq } from 'drizzle-orm';
 
 import {
   apiError,
@@ -85,51 +84,4 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   return apiSuccess(updated);
-}
-
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  let userId: string;
-  try {
-    userId = await requireAuth();
-  } catch (res) {
-    return res as Response;
-  }
-
-  const { id } = await params;
-  const db = getDbClient();
-  const store = new DrizzleAgentConfigStore(db);
-  const projectAgentService = new ProjectAgentService(db);
-  const agent = await store.getById(id);
-  if (!agent?.projectId) {
-    return apiError(404, 'NOT_FOUND', 'Agent not found');
-  }
-
-  const role = await getProjectRole(agent.projectId, userId);
-  if (!role || (role !== 'owner' && role !== 'admin')) {
-    return apiError(403, 'FORBIDDEN', 'Only owner or admin can delete agents');
-  }
-
-  const removed = await store.remove(id);
-  if (!removed) {
-    return apiError(404, 'NOT_FOUND', 'Agent not found');
-  }
-
-  const current = await projectAgentService.getCurrentAgent(agent.projectId);
-  if (current?.agentId === id) {
-    await db
-      .update(projectAgents)
-      .set({ isCurrent: false, updatedAt: new Date() })
-      .where(and(eq(projectAgents.projectId, agent.projectId), eq(projectAgents.agentId, id)));
-
-    const replacement = await db
-      .select({ id: agents.id })
-      .from(agents)
-      .where(and(eq(agents.projectId, agent.projectId), eq(agents.status, 'active')))
-      .limit(1);
-    if (replacement[0]) {
-      await projectAgentService.setCurrentAgent(agent.projectId, replacement[0].id);
-    }
-  }
-
-  return apiSuccess({ deleted: true });
 }
